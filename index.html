@@ -1009,6 +1009,10 @@ table.vbct-tbl td.c { text-align: center; }
   font-family: monospace;
 }
 .pf-weight-input:focus { outline: 2px solid var(--blue-mid); border-color: transparent; }
+.pf-invest-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; color: var(--text); }
+.pf-invest-row label { font-weight: 700; }
+.pf-invest-row input#pf-invest-amt { width: 90px; }
+.pf-invest-row span { color: var(--muted); font-size: 12px; }
 .pf-builder-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 4px; }
 .pf-builder-btns { display: flex; gap: 8px; flex-wrap: wrap; }
 .pf-sec-btn {
@@ -1543,6 +1547,7 @@ function resolveRangeIndices(dates, range, customStart, customEnd) {
   return { startIdx: rangeStartIdx(dates, range), endIdx: dates.length - 1 };
 }
 // ─────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────
 // freqBadge（與 vbct/vcct 工具共用之配息頻率徽章渲染）
 // ─────────────────────────────────────────────────────────
 function freqBadge(freq) {
@@ -1897,11 +1902,19 @@ function renderPfAnalysis() {
   var excludedNote = s.excludedCount > 0
     ? '<div class="pf-breakdown-note">' + ICON.warnSm + ' 有 ' + s.excludedCount + ' 個基金因逐日淨值資料不足已自動排除於本次組合分析</div>'
     : '';
+  var investHtml = s.divByMonth
+    ? '<div class="bt-section-title">' + ICON.coin + ' 投入金額試算（固定採近12個月配息，與上方期間分頁無關）</div>'
+      + '<div class="pf-invest-row"><label for="pf-invest-amt">投入金額</label>'
+      + '<input type="number" id="pf-invest-amt" class="pf-weight-input" min="1" step="1" value="100" oninput="pfRenderInvestEstimate()">'
+      + '<span>萬元（新台幣，假設於組合資料起始日整筆投入）</span></div>'
+      + '<div id="pf-invest-result"></div>'
+    : '';
   $('pf-analysis-body').innerHTML = excludedNote + divNote + modeToggle + rangeToggle + customRangeHtml
-    + '<div id="pf-main"></div><div id="pf-winrate"></div>' + renderPfBreakdown(s.meta);
+    + '<div id="pf-main"></div><div id="pf-winrate"></div>' + renderPfBreakdown(s.meta) + investHtml;
   $('pf-analysis-wrap').style.display = 'block';
   pfRenderMain();
   pfRenderWinRate();
+  pfRenderInvestEstimate();
   $('pf-analysis-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 function pfRenderMain() {
@@ -1930,7 +1943,7 @@ function pfRenderMain() {
     + btStat('期間最高', stats.high.toFixed(4))
     + btStat('期間最低', stats.low.toFixed(4))
     + btStat('目前指數', stats.cur.toFixed(4))
-    + btStat('期間配息合計', divTotalStr)
+    + btStat('期間配息合計（指數點）', divTotalStr)
     + btStat('配息調整次數', divFreqStr)
     + '</div>';
   el.innerHTML = '<div class="bt-meta">資料區間：' + stats.startDate + ' ～ ' + stats.endDate + '　（' + stats.n + ' 個交易日；組合以重疊區間起始日 = 100 之指數化淨值呈現，本金與配息分開計算）</div>' + chartHtml + statsHtml;
@@ -2036,8 +2049,42 @@ function renderPfBreakdown(meta) {
       + '</tr>';
   }).join('');
   return '<div class="bt-section-title">' + ICON.list + ' 各基金個別表現（本金／淨值，依完整重疊區間計算，不隨上方區間切換）</div>'
-    + '<div class="pf-breakdown-note">配息合計為該基金原始幣別單位之金額，僅供參考個別貢獻，不直接加總於組合指數化數字中。</div>'
-    + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr><th>基金</th><th class="r">權重</th><th class="r">期間報酬（淨值）</th><th class="r">期間配息合計</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+    + '<div class="pf-breakdown-note">此欄「期間配息合計」為該基金「原始幣別、原始單位金額」之加總（例如美元基金即為美元金額），未套用權重、也未換算成組合指數點數，與上方「期間配息合計（指數點）」是兩種不同單位、不同計算期間的數字，兩者本來就不會相等、也不能直接相加比較，僅供參考各基金自身配息規模。組合指數點數的換算方式請見下方「投入金額試算」。</div>'
+    + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr><th>基金</th><th class="r">權重</th><th class="r">期間報酬（淨值）</th><th class="r">期間配息合計（原幣）</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
+}
+// ─────────────────────────────────────────────────────────
+// 投入金額試算：將組合指數點數換算為實際新台幣金額
+// （固定以「重疊區間起始日 = 100 點」為基準，與上方期間分頁切換無關，
+//  配息部分固定採近 12 個月之歷史平均，藉此換算「每月約可配多少錢」）
+// ─────────────────────────────────────────────────────────
+function trailing12mDivStats(divByMonth) {
+  if (!divByMonth) return null;
+  var keys = Object.keys(divByMonth).sort();
+  if (!keys.length) return null;
+  var last = keys.slice(-12);
+  var sum = last.reduce(function(s, k) { return s + divByMonth[k]; }, 0);
+  return { months: last, sum: sum, count: last.length, avg: last.length ? sum / last.length : 0 };
+}
+function pfRenderInvestEstimate() {
+  var s = _pfState;
+  var el = $('pf-invest-result');
+  if (!s || !el) return;
+  if (!s.divByMonth) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">本組合所選基金皆無配息，無法試算配息金額</div>'; return; }
+  var amtEl = $('pf-invest-amt');
+  var amt = amtEl ? parseFloat(amtEl.value) : NaN;
+  if (!amt || amt <= 0) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">' + ICON.warnSm + ' 請輸入大於 0 的投入金額</div>'; return; }
+  var t12 = trailing12mDivStats(s.divByMonth);
+  if (!t12 || !t12.count) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">無近期配息月份資料可供試算</div>'; return; }
+  var pointValue = amt / 100; // 每一指數點對應之萬元金額（以重疊區間起始日 100 點為基準）
+  var sumAmt = t12.sum * pointValue;
+  var avgAmt = t12.avg * pointValue;
+  el.innerHTML = '<div class="bt-stats-grid">'
+    + btStat('換算基準', '每點＝' + pointValue.toFixed(4) + ' 萬元')
+    + btStat('採計月數', t12.count + ' 個月' + (t12.count < 12 ? '（資料不足12個月）' : ''))
+    + btStat('近' + t12.count + '個月配息合計', sumAmt.toFixed(2) + ' 萬元')
+    + btStat('近' + t12.count + '個月平均月配息', avgAmt.toFixed(2) + ' 萬元')
+    + '</div>'
+    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 假設於組合資料起始日（' + s.dates[0] + '）一次性投入上方設定金額，此時組合指數＝100 點，故每 1 點配息對應「投入金額 ÷ 100」之新台幣金額。月配息採近 12 個月（資料不足則採全部可用月數）之歷史配息加權平均，僅為歷史回顧估算，不代表未來實際配息水準，配息來源亦可能部分或全部為本金。本試算與上方「期間配息合計（指數點）」「各基金個別表現」之原幣金額為不同單位，僅此區塊已換算為新台幣參考金額。</div>';
 }
 // Esc 鍵：目前無 Modal 需要關閉，保留供未來擴充
 // ─────────────────────────────────────────────────────────
