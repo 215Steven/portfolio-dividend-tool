@@ -1903,7 +1903,7 @@ function renderPfAnalysis() {
     ? '<div class="pf-breakdown-note">' + ICON.warnSm + ' 有 ' + s.excludedCount + ' 個基金因逐日淨值資料不足已自動排除於本次組合分析</div>'
     : '';
   var investHtml = s.divByMonth
-    ? '<div class="bt-section-title">' + ICON.coin + ' 投入金額試算（固定採近12個月配息，與上方期間分頁無關）</div>'
+    ? '<div class="bt-section-title">' + ICON.coin + ' 投入金額試算（已領金額，與上方期間分頁同步）</div>'
       + '<div class="pf-invest-row"><label for="pf-invest-amt">投入金額</label>'
       + '<input type="number" id="pf-invest-amt" class="pf-weight-input" min="1" step="1" value="100" oninput="pfRenderInvestEstimate()">'
       + '<span>萬元（新台幣，假設於組合資料起始日整筆投入）</span></div>'
@@ -2023,6 +2023,7 @@ function setPfRange(val) {
   if (customEl) customEl.style.display = (val === 'custom') ? 'flex' : 'none';
   pfRenderMain();
   pfRenderWinRate();
+  pfRenderInvestEstimate();
 }
 function applyPfCustomRange() {
   if (!_pfState) return;
@@ -2034,6 +2035,7 @@ function applyPfCustomRange() {
   _pfState.customEnd = endV;
   pfRenderMain();
   pfRenderWinRate();
+  pfRenderInvestEstimate();
 }
 function renderPfBreakdown(meta) {
   if (!meta || !meta.length) return '';
@@ -2054,17 +2056,9 @@ function renderPfBreakdown(meta) {
 }
 // ─────────────────────────────────────────────────────────
 // 投入金額試算：將組合指數點數換算為實際新台幣金額
-// （固定以「重疊區間起始日 = 100 點」為基準，與上方期間分頁切換無關，
-//  配息部分固定採近 12 個月之歷史平均，藉此換算「每月約可配多少錢」）
+// （固定以「重疊區間起始日 = 100 點」為換算基準；但採計的配息期間
+//  與上方「全部／1年／3年…」期間分頁同步，回答「這段期間大約已領多少」）
 // ─────────────────────────────────────────────────────────
-function trailing12mDivStats(divByMonth) {
-  if (!divByMonth) return null;
-  var keys = Object.keys(divByMonth).sort();
-  if (!keys.length) return null;
-  var last = keys.slice(-12);
-  var sum = last.reduce(function(s, k) { return s + divByMonth[k]; }, 0);
-  return { months: last, sum: sum, count: last.length, avg: last.length ? sum / last.length : 0 };
-}
 function pfRenderInvestEstimate() {
   var s = _pfState;
   var el = $('pf-invest-result');
@@ -2073,18 +2067,21 @@ function pfRenderInvestEstimate() {
   var amtEl = $('pf-invest-amt');
   var amt = amtEl ? parseFloat(amtEl.value) : NaN;
   if (!amt || amt <= 0) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">' + ICON.warnSm + ' 請輸入大於 0 的投入金額</div>'; return; }
-  var t12 = trailing12mDivStats(s.divByMonth);
-  if (!t12 || !t12.count) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">無近期配息月份資料可供試算</div>'; return; }
+  var idxR = resolveRangeIndices(s.dates, s.range, s.customStart, s.customEnd);
+  var startDate = s.dates[idxR.startIdx], endDate = s.dates[idxR.endIdx];
+  var divStats = computeDivStats(s.divByMonth, startDate.substring(0, 7), endDate.substring(0, 7));
+  if (!divStats.totalCount) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">所選期間內無配息月份資料可供試算</div>'; return; }
   var pointValue = amt / 100; // 每一指數點對應之萬元金額（以重疊區間起始日 100 點為基準）
-  var sumAmt = t12.sum * pointValue;
-  var avgAmt = t12.avg * pointValue;
+  var totalAmt = divStats.total * pointValue;
+  var avgAmt = totalAmt / divStats.totalCount;
   el.innerHTML = '<div class="bt-stats-grid">'
     + btStat('換算基準', '每點＝' + pointValue.toFixed(4) + ' 萬元')
-    + btStat('採計月數', t12.count + ' 個月' + (t12.count < 12 ? '（資料不足12個月）' : ''))
-    + btStat('近' + t12.count + '個月配息合計', sumAmt.toFixed(2) + ' 萬元')
-    + btStat('近' + t12.count + '個月平均月配息', avgAmt.toFixed(2) + ' 萬元')
+    + btStat('試算期間', startDate + ' ～ ' + endDate)
+    + btStat('期間配息月數', divStats.totalCount + ' 個月')
+    + btStat('已領金額（期間合計）', totalAmt.toFixed(2) + ' 萬元')
+    + btStat('期間平均月配息', avgAmt.toFixed(2) + ' 萬元')
     + '</div>'
-    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 假設於組合資料起始日（' + s.dates[0] + '）一次性投入上方設定金額，此時組合指數＝100 點，故每 1 點配息對應「投入金額 ÷ 100」之新台幣金額。月配息採近 12 個月（資料不足則採全部可用月數）之歷史配息加權平均，僅為歷史回顧估算，不代表未來實際配息水準，配息來源亦可能部分或全部為本金。本試算與上方「期間配息合計（指數點）」「各基金個別表現」之原幣金額為不同單位，僅此區塊已換算為新台幣參考金額。</div>';
+    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 假設於組合資料起始日（' + s.dates[0] + '）一次性投入上方設定金額，此時組合指數＝100 點，故每 1 點配息對應「投入金額 ÷ 100」之新台幣金額；上方「已領金額」即依此換算「' + startDate + ' ～ ' + endDate + '」（隨上方期間分頁切換）期間內，依目前權重持有本組合、且配息未再投資之假設下，累計約可領取之新台幣金額，僅為歷史回顧估算，不代表未來實際配息水準，配息來源亦可能部分或全部為本金。本試算與上方「期間配息合計（指數點）」「各基金個別表現」之原幣金額為不同單位，僅此區塊已換算為新台幣參考金額。</div>';
 }
 // Esc 鍵：目前無 Modal 需要關閉，保留供未來擴充
 // ─────────────────────────────────────────────────────────
