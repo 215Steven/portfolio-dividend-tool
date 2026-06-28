@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>組合分析工具 | VBCT／VCCT 自訂權重組合（非官方）</title>
+<title>組合分析工具 | VBCT／VCCT／UND 自訂權重組合（非官方）</title>
 <style>
 /* ═══════════════════════════════════════════════
    VBCT 配息率工具 — 全域樣式
@@ -956,6 +956,7 @@ table.vbct-tbl td.c { text-align: center; }
 .src-badge { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap; }
 .src-VBCT { background: var(--blue); }
 .src-VCCT { background: #c2410c; }
+.src-UND  { background: #15803d; }
 .pf-results-note { font-size: 11.5px; color: var(--muted); margin-bottom: 8px; }
 .pf-add-btn {
   background: var(--blue-pale);
@@ -1066,7 +1067,7 @@ table.vbct-tbl td.c { text-align: center; }
 </head>
 <body>
 <!-- ═══════════════════════════════════════════════════════════
-     組合分析工具（VBCT／VCCT 混合自訂權重組合）Web 版
+     組合分析工具（VBCT／VCCT／UND 混合自訂權重組合）Web 版
      非官方工具，與富邦人壽無任何關聯
      資料來源：invest.fubonlife.com.tw
      本金（淨值）與配息分開計算，邏輯與單一標的分析工具一致
@@ -1079,7 +1080,7 @@ table.vbct-tbl td.c { text-align: center; }
         組合分析工具
         <span class="vbct-title-badge">非官方</span>
       </div>
-      <div class="vbct-subtitle">自訂權重組合 VBCT／VCCT 多檔標的，本金（淨值）與配息分開計算　｜　點基金名稱可開啟富邦官網頁面</div>
+      <div class="vbct-subtitle">自訂權重組合 VBCT／VCCT／UND 多檔標的，本金（淨值）與配息分開計算　｜　點基金名稱可開啟富邦官網頁面</div>
     </div>
     <button class="vbct-btn" onclick="loadFundUniverse(true)"><svg class="i" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> 重新載入基金清單</button>
   </div>
@@ -1094,6 +1095,7 @@ table.vbct-tbl td.c { text-align: center; }
       <select id="pf-search-src" onchange="renderSearchResults()">
         <option value="VBCT" selected>僅 VBCT</option>
         <option value="VCCT">僅 VCCT</option>
+        <option value="UND">僅 UND</option>
       </select>
     </div>
     <div class="pf-results-note" id="pf-results-note"></div>
@@ -1556,7 +1558,7 @@ function freqBadge(freq) {
 // ─────────────────────────────────────────────────────────
 // localStorage 快取（基金清單，每日台灣中午 12 點更新）
 // ─────────────────────────────────────────────────────────
-var FUND_CACHE_KEY = 'portfolio-fundlist-v1';
+var FUND_CACHE_KEY = 'portfolio-fundlist-v2';
 function nextNoonTW() {
   var now = new Date();
   var candidate = new Date(now);
@@ -1579,7 +1581,7 @@ function saveFundCache(list) {
   } catch(e) { /* 容量不足時靜默失敗 */ }
 }
 // ─────────────────────────────────────────────────────────
-// 基金清單抓取（同時支援 VBCT／VCCT 兩種商品代碼）
+// 基金清單抓取（同時支援 VBCT／VCCT／UND 三種商品代碼）
 // ─────────────────────────────────────────────────────────
 async function fetchFundList(product) {
   var text = await fetchBig5('/w/custom/djjson/SearchProductJSON.djjson?m=0&P=' + product + '&Change=1');
@@ -1610,17 +1612,17 @@ async function loadFundUniverse(force) {
     if (cached && cached.list && cached.list.length) {
       window._fundUniverse = cached.list;
       renderSearchResults();
-      if (statusEl) statusEl.innerHTML = ICON.zap + ' 已載入快取：VBCT + VCCT 共 ' + cached.list.length + ' 筆標的';
+      if (statusEl) statusEl.innerHTML = ICON.zap + ' 已載入快取：VBCT + VCCT + UND 共 ' + cached.list.length + ' 筆標的';
       return;
     }
   }
   try {
-    var lists = await Promise.all([fetchFundList('VBCT'), fetchFundList('VCCT')]);
-    var combined = lists[0].concat(lists[1]);
+    var lists = await Promise.all([fetchFundList('VBCT'), fetchFundList('VCCT'), fetchFundList('UND')]);
+    var combined = lists[0].concat(lists[1]).concat(lists[2]);
     window._fundUniverse = combined;
     saveFundCache(combined);
     renderSearchResults();
-    if (statusEl) statusEl.innerHTML = ICON.zap + ' VBCT ' + lists[0].length + ' 筆／VCCT ' + lists[1].length + ' 筆，共 ' + combined.length + ' 筆標的';
+    if (statusEl) statusEl.innerHTML = ICON.zap + ' VBCT ' + lists[0].length + ' 筆／VCCT ' + lists[1].length + ' 筆／UND ' + lists[2].length + ' 筆，共 ' + combined.length + ' 筆標的';
   } catch(e) {
     if (statusEl) statusEl.innerHTML = ICON.error + ' 載入基金清單失敗：' + eh(e.message) + '<br><small style="color:#b91c1c">請確認網路連線後按「重新載入清單」再試一次。</small>';
   }
@@ -1715,7 +1717,7 @@ function renderPortfolioList() {
   var wrap = $('pf-fund-list');
   if (!wrap) return;
   if (!_portfolio.length) {
-    wrap.innerHTML = '<div class="pf-empty">尚未加入任何基金，請從上方搜尋並加入（可同時混合 VBCT／VCCT 標的）</div>';
+    wrap.innerHTML = '<div class="pf-empty">尚未加入任何基金，請從上方搜尋並加入（可同時混合 VBCT／VCCT／UND 標的）</div>';
   } else {
     wrap.innerHTML = _portfolio.map(function(p) {
       return '<div class="pf-fund-row">'
