@@ -1092,8 +1092,7 @@ table.vbct-tbl td.c { text-align: center; }
     <div class="pf-search-row">
       <input id="pf-search-q" type="text" placeholder="輸入基金名稱或代碼搜尋..." oninput="pfSearchDebounced()" autocomplete="off">
       <select id="pf-search-src" onchange="renderSearchResults()">
-        <option value="">全部來源（VBCT＋VCCT）</option>
-        <option value="VBCT">僅 VBCT</option>
+        <option value="VBCT" selected>僅 VBCT</option>
         <option value="VCCT">僅 VCCT</option>
       </select>
     </div>
@@ -1785,10 +1784,8 @@ async function buildPortfolio() {
     axis.forEach(function(d, i) { dateToAxisIdx[d] = i; });
     var totalWeight = included.reduce(function(s, r) { return s + (r.p.weight || 0); }, 0) || included.length;
     var hasAnyDiv = false;
-    var rawIndexPortfolio = new Array(axis.length).fill(0);
-    var adjIndexPortfolio = new Array(axis.length).fill(0);
-    var combinedDivByMonth = {};
-    var portfolioDivOnIdx = {};
+    var hasAnyDivMonth = false;
+    var fundsForRebase = [];
     var meta = [];
     included.forEach(function(r) {
       var wNorm = (r.p.weight || 0) / totalWeight;
@@ -1800,6 +1797,8 @@ async function buildPortfolio() {
         while (fi < r.dates.length && r.dates[fi] <= ad) { lastVal = r.navs[fi]; fi++; }
         filledRaw[i] = lastVal;
       }
+      // rawAtStart／indexSeries 僅供下方「各基金個別表現」固定以完整重疊區間起始日為基準使用；
+      // 組合本身（本金走勢／配息點數）改採「上方所選期間起始日」動態重新基準化，詳見 pfRecomputePeriod()
       var rawAtStart = filledRaw[0] || r.navs[0];
       var indexSeries = filledRaw.map(function(v) { return rawAtStart > 0 ? v / rawAtStart * 100 : 0; });
       // 該基金自身配息還原（含息）序列
@@ -1807,58 +1806,46 @@ async function buildPortfolio() {
       var adjNavsOwn = buildAdjustedNav(r.dates, r.navs, divOnIdxOwn);
       var divByMonthOwn = buildDivByMonth(r.divs);
       var hasOwnDiv = !!(divOnIdxOwn && adjNavsOwn);
-      var adjIndexSeries;
+      var filledAdj = null;
       if (hasOwnDiv) {
         hasAnyDiv = true;
-        var filledAdj = new Array(axis.length);
+        filledAdj = new Array(axis.length);
         var fi2 = 0, lastAdj = adjNavsOwn[0];
         for (var i2 = 0; i2 < axis.length; i2++) {
           var ad2 = axis[i2];
           while (fi2 < r.dates.length && r.dates[fi2] <= ad2) { lastAdj = adjNavsOwn[fi2]; fi2++; }
           filledAdj[i2] = lastAdj;
         }
-        var adjAtStart = filledAdj[0] || adjNavsOwn[0];
-        adjIndexSeries = filledAdj.map(function(v) { return adjAtStart > 0 ? v / adjAtStart * 100 : 0; });
-      } else {
-        adjIndexSeries = indexSeries;
       }
-      for (var k = 0; k < axis.length; k++) {
-        rawIndexPortfolio[k] += wNorm * indexSeries[k];
-        adjIndexPortfolio[k] += wNorm * adjIndexSeries[k];
-      }
-      var divMonthKeys = Object.keys(divByMonthOwn);
-      if (divMonthKeys.length && rawAtStart > 0) {
-        divMonthKeys.forEach(function(mk) {
-          var scaled = wNorm * (divByMonthOwn[mk] / rawAtStart * 100);
-          combinedDivByMonth[mk] = (combinedDivByMonth[mk] || 0) + scaled;
-        });
-      }
-      if (divOnIdxOwn && rawAtStart > 0) {
+      // 將該基金自身配息（依其原生交易日曆判定之月末索引）對應到統一日期軸索引，金額維持原幣、未套用權重，
+      // 留待 pfRecomputePeriod() 依「當前所選期間之起始日淨值」動態換算
+      var divOnIdxAxis = null;
+      if (divOnIdxOwn) {
+        divOnIdxAxis = {};
         Object.keys(divOnIdxOwn).forEach(function(ownIdxStr) {
           var ownIdx = parseInt(ownIdxStr, 10);
           var d = r.dates[ownIdx];
           if (d === undefined) return;
           var axisIdx = dateToAxisIdx[d];
           if (axisIdx === undefined) return;
-          var scaled = wNorm * (divOnIdxOwn[ownIdx] / rawAtStart * 100);
-          portfolioDivOnIdx[axisIdx] = (portfolioDivOnIdx[axisIdx] || 0) + scaled;
+          divOnIdxAxis[axisIdx] = (divOnIdxAxis[axisIdx] || 0) + divOnIdxOwn[ownIdx];
         });
       }
-      // 個別基金績效（依完整重疊區間計算，僅本金/淨值，不含配息）
+      var divMonthKeys = Object.keys(divByMonthOwn);
+      if (divMonthKeys.length) hasAnyDivMonth = true;
+      fundsForRebase.push({ wNorm: wNorm, filledRaw: filledRaw, filledAdj: filledAdj, divByMonthOwn: divByMonthOwn, divOnIdxAxis: divOnIdxAxis });
+      // 個別基金績效（依完整重疊區間計算，僅本金/淨值，不含配息，不隨上方期間分頁切換）
       var ownStats = computeStats(axis, indexSeries);
       var sMonth = axis[0].substring(0, 7), eMonth = axis[axis.length - 1].substring(0, 7);
       var ownDivTotal = 0;
       divMonthKeys.forEach(function(mk) { if (mk >= sMonth && mk <= eMonth) ownDivTotal += divByMonthOwn[mk]; });
       meta.push({ name: r.p.name, source: r.p.source, code: r.p.code, weight: r.p.weight || 0, wNorm: wNorm * 100, stats: ownStats, hasDiv: divMonthKeys.length > 0, divTotal: ownDivTotal });
     });
-    var divByMonthKeys = Object.keys(combinedDivByMonth);
-    var divOnIdxKeys = Object.keys(portfolioDivOnIdx);
     _pfState = {
       dates: axis,
-      rawNavs: rawIndexPortfolio,
-      adjNavs: hasAnyDiv ? adjIndexPortfolio : null,
-      divOnIdx: divOnIdxKeys.length ? portfolioDivOnIdx : null,
-      divByMonth: divByMonthKeys.length ? combinedDivByMonth : null,
+      funds: fundsForRebase,
+      hasAnyDiv: hasAnyDiv,
+      hasAnyDivMonth: hasAnyDivMonth,
       mode: 'raw', range: 3, customStart: null, customEnd: null,
       meta: meta,
       excludedCount: _portfolio.length - included.length
@@ -1876,10 +1863,10 @@ async function buildPortfolio() {
 function renderPfAnalysis() {
   var s = _pfState;
   if (!s) return;
-  var divNote = s.adjNavs
+  var divNote = s.hasAnyDiv
     ? '<div class="bt-div-note">' + ICON.coin + ' 已將各基金歷史配息依權重併入「還原(含息)」組合序列（假設配息發生於當月最後一個交易日，並按當時淨值滾入計算，含再投資複利效果）。可用下方按鈕切換顯示淨值（未還原）或還原(含息)結果。下方「賺錢機率」則改用較單純之「淨值變化＋配息金額」方式計算。</div>'
     : '';
-  var modeToggle = s.adjNavs
+  var modeToggle = s.hasAnyDiv
     ? '<div class="bt-mode-toggle" id="pf-mode-toggle">'
       + '<button class="bt-mode-btn active" data-mode="raw" onclick="setPfMode(\'raw\')">' + ICON.chart + ' 淨值（未還原）</button>'
       + '<button class="bt-mode-btn" data-mode="adj" onclick="setPfMode(\'adj\')">' + ICON.coin + ' 還原(含息)</button>'
@@ -1902,7 +1889,7 @@ function renderPfAnalysis() {
   var excludedNote = s.excludedCount > 0
     ? '<div class="pf-breakdown-note">' + ICON.warnSm + ' 有 ' + s.excludedCount + ' 個基金因逐日淨值資料不足已自動排除於本次組合分析</div>'
     : '';
-  var investHtml = s.divByMonth
+  var investHtml = s.hasAnyDivMonth
     ? '<div class="bt-section-title">' + ICON.coin + ' 投入金額試算（已領金額，與上方期間分頁同步）</div>'
       + '<div class="pf-invest-row"><label for="pf-invest-amt">投入金額</label>'
       + '<input type="number" id="pf-invest-amt" class="pf-weight-input" min="1" step="1" value="100" oninput="pfRenderInvestEstimate()">'
@@ -1917,21 +1904,63 @@ function renderPfAnalysis() {
   pfRenderInvestEstimate();
   $('pf-analysis-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
+// ─────────────────────────────────────────────────────────
+// 核心：依「上方所選期間」之起始日，將各基金重新基準化（該日淨值＝100）後
+// 依目前權重加權合成組合本金指數與配息點數（含「還原(含息)」序列）。
+// 與固定以「整個重疊區間起始日」為基準的舊版做法不同：切換 1年／3年／自訂…
+// 等期間分頁時，等同模擬「在該期間起始日當下，依目前設定權重重新一次性建立此組合」，
+// 避免長期累積的個股漲跌幅差異扭曲短期區間的本金走勢與配息點數換算。
+// ─────────────────────────────────────────────────────────
+function pfRecomputePeriod(s, startIdx, endIdx) {
+  var n = endIdx - startIdx + 1;
+  var raw = new Array(n).fill(0);
+  var adj = new Array(n).fill(0);
+  var hasAdj = false;
+  var divByMonth = {};
+  var divOnIdx = {};
+  (s.funds || []).forEach(function(f) {
+    var base = f.filledRaw[startIdx];
+    if (!(base > 0)) return;
+    for (var k = 0; k < n; k++) raw[k] += f.wNorm * (f.filledRaw[startIdx + k] / base * 100);
+    var adjBase = f.filledAdj ? f.filledAdj[startIdx] : base;
+    var useAdj = f.filledAdj && adjBase > 0;
+    if (useAdj) hasAdj = true;
+    for (var k2 = 0; k2 < n; k2++) {
+      var av = useAdj ? (f.filledAdj[startIdx + k2] / adjBase * 100) : (f.filledRaw[startIdx + k2] / base * 100);
+      adj[k2] += f.wNorm * av;
+    }
+    Object.keys(f.divByMonthOwn).forEach(function(mk) {
+      divByMonth[mk] = (divByMonth[mk] || 0) + f.wNorm * (f.divByMonthOwn[mk] / base * 100);
+    });
+    if (f.divOnIdxAxis) {
+      Object.keys(f.divOnIdxAxis).forEach(function(idxStr) {
+        var ai = parseInt(idxStr, 10);
+        if (ai < startIdx || ai > endIdx) return;
+        divOnIdx[ai] = (divOnIdx[ai] || 0) + f.wNorm * (f.divOnIdxAxis[idxStr] / base * 100);
+      });
+    }
+  });
+  return {
+    raw: raw,
+    adj: hasAdj ? adj : null,
+    divByMonth: Object.keys(divByMonth).length ? divByMonth : null,
+    divOnIdx: Object.keys(divOnIdx).length ? divOnIdx : null
+  };
+}
 function pfRenderMain() {
   var s = _pfState;
   if (!s) return;
   var idxR = resolveRangeIndices(s.dates, s.range, s.customStart, s.customEnd);
+  var period = pfRecomputePeriod(s, idxR.startIdx, idxR.endIdx);
   var dates = s.dates.slice(idxR.startIdx, idxR.endIdx + 1);
-  var rawNavs = s.rawNavs.slice(idxR.startIdx, idxR.endIdx + 1);
-  var adjNavsSliced = s.adjNavs ? s.adjNavs.slice(idxR.startIdx, idxR.endIdx + 1) : null;
-  var navs = s.mode === 'adj' && adjNavsSliced ? adjNavsSliced : rawNavs;
+  var navs = s.mode === 'adj' && period.adj ? period.adj : period.raw;
   var stats = computeStats(dates, navs);
   var el = $('pf-main');
   if (!el) return;
   if (!stats) { el.innerHTML = '<div class="bt-loading">' + ICON.warn + ' 資料不足無法計算</div>'; return; }
   var chartHtml = buildNavChartSvg(dates, navs);
-  var hasDivData = !!s.divByMonth;
-  var divStats = hasDivData ? computeDivStats(s.divByMonth, dates[0].substring(0, 7), dates[dates.length - 1].substring(0, 7)) : { total: 0, adjCount: null, totalCount: 0 };
+  var hasDivData = !!period.divByMonth;
+  var divStats = hasDivData ? computeDivStats(period.divByMonth, dates[0].substring(0, 7), dates[dates.length - 1].substring(0, 7)) : { total: 0, adjCount: null, totalCount: 0 };
   var divTotalStr = hasDivData ? divStats.total.toFixed(4) : '無';
   var divFreqStr = hasDivData ? (divStats.totalCount > 0 ? (divStats.adjCount + ' / ' + divStats.totalCount) : '—') : '無';
   var statsHtml = '<div class="bt-stats-grid">'
@@ -1946,13 +1975,13 @@ function pfRenderMain() {
     + btStat('期間配息合計（指數點）', divTotalStr)
     + btStat('配息調整次數', divFreqStr)
     + '</div>';
-  el.innerHTML = '<div class="bt-meta">資料區間：' + stats.startDate + ' ～ ' + stats.endDate + '　（' + stats.n + ' 個交易日；組合以重疊區間起始日 = 100 之指數化淨值呈現，本金與配息分開計算）</div>' + chartHtml + statsHtml;
+  el.innerHTML = '<div class="bt-meta">資料區間：' + stats.startDate + ' ～ ' + stats.endDate + '　（' + stats.n + ' 個交易日；組合以上方所選期間起始日 = 100 重新依目前權重基準化呈現，本金與配息分開計算）</div>' + chartHtml + statsHtml;
 }
-function renderPfWinRateHtml(s, idxR) {
+function renderPfWinRateHtml(s, idxR, period) {
   var startIdx = idxR.startIdx;
-  var rawNavs = s.rawNavs.slice(idxR.startIdx, idxR.endIdx + 1);
-  if (s.divOnIdx) {
-    var slicedDiv = sliceDivOnIdx(s.divOnIdx, startIdx);
+  var rawNavs = period.raw;
+  if (period.divOnIdx) {
+    var slicedDiv = sliceDivOnIdx(period.divOnIdx, startIdx);
     var divCum = buildDivCum(slicedDiv, rawNavs.length);
     var winList = computeWinRatesDual(rawNavs, divCum);
     if (winList.length) {
@@ -1993,7 +2022,8 @@ function pfRenderWinRate() {
   var el = $('pf-winrate');
   if (!s || !el) return;
   var idxR = resolveRangeIndices(s.dates, s.range, s.customStart, s.customEnd);
-  el.innerHTML = renderPfWinRateHtml(s, idxR);
+  var period = pfRecomputePeriod(s, idxR.startIdx, idxR.endIdx);
+  el.innerHTML = renderPfWinRateHtml(s, idxR, period);
 }
 function setPfMode(mode) {
   if (!_pfState || _pfState.mode === mode) return;
@@ -2056,7 +2086,7 @@ function renderPfBreakdown(meta) {
 }
 // ─────────────────────────────────────────────────────────
 // 投入金額試算：將組合指數點數換算為實際新台幣金額
-// （換算基準＝「上方所選期間」起始日當時的組合指數水準，等同假設於
+// （組合本身已改為依「上方所選期間」起始日重新基準化＝100 點，等同假設於
 //  該起始日依目前權重重新投入金額；採計的配息期間與上方「全部／1年／
 //  3年…」期間分頁同步，回答「若從這段期間起點投入，這段期間大約已領多少」）
 // ─────────────────────────────────────────────────────────
@@ -2064,18 +2094,20 @@ function pfRenderInvestEstimate() {
   var s = _pfState;
   var el = $('pf-invest-result');
   if (!s || !el) return;
-  if (!s.divByMonth) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">本組合所選基金皆無配息，無法試算配息金額</div>'; return; }
+  if (!s.hasAnyDivMonth) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">本組合所選基金皆無配息，無法試算配息金額</div>'; return; }
   var amtEl = $('pf-invest-amt');
   var amt = amtEl ? parseFloat(amtEl.value) : NaN;
   if (!amt || amt <= 0) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">' + ICON.warnSm + ' 請輸入大於 0 的投入金額</div>'; return; }
   var idxR = resolveRangeIndices(s.dates, s.range, s.customStart, s.customEnd);
+  var period = pfRecomputePeriod(s, idxR.startIdx, idxR.endIdx);
   var startDate = s.dates[idxR.startIdx], endDate = s.dates[idxR.endIdx];
-  var divStats = computeDivStats(s.divByMonth, startDate.substring(0, 7), endDate.substring(0, 7));
+  if (!period.divByMonth) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">所選期間內無配息月份資料可供試算</div>'; return; }
+  var divStats = computeDivStats(period.divByMonth, startDate.substring(0, 7), endDate.substring(0, 7));
   if (!divStats.totalCount) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">所選期間內無配息月份資料可供試算</div>'; return; }
-  // 以「上方所選期間」之起始日當時的組合指數水準為換算基準（而非固定採組合資料最早起始日＝100點），
-  // 等同假設於選定期間起始日，依目前各基金權重重新一次性投入金額；
-  // 當所選期間為「全部」時，起始日指數恰為 100，換算結果與舊版（固定 100 點基準）完全相同。
-  var startIdxLevel = s.rawNavs[idxR.startIdx] || 100;
+  // 組合本金序列已於 pfRecomputePeriod() 依「上方所選期間」起始日重新基準化（恆為 100 點），
+  // 等同假設於選定期間起始日，依目前各基金權重重新一次性投入金額；此處仍以 period.raw[0] 取值
+  // （理論上恆為 100）而非寫死常數，以防禦未來計算邏輯調整時產生不一致。
+  var startIdxLevel = period.raw[0] || 100;
   var pointValue = amt / startIdxLevel; // 每一指數點對應之萬元金額（以所選期間起始日當時指數水準為基準）
   var totalAmt = divStats.total * pointValue;
   var avgAmt = totalAmt / divStats.totalCount;
