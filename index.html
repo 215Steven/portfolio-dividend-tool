@@ -1329,7 +1329,10 @@ function computeStats(dates, navs) {
   }
   var meanR = rets.length ? rets.reduce(function(s, v) { return s + v; }, 0) / rets.length : 0;
   var variance = rets.length ? rets.reduce(function(s, v) { return s + Math.pow(v - meanR, 2); }, 0) / rets.length : 0;
-  var annVol = Math.sqrt(variance) * Math.sqrt(252) * 100;
+  // 年化基準：依「實際資料筆數 ÷ 實際年數」換算每年取樣頻率，而非固定假設 252 個交易日／年。
+  // 組合之統一日期軸為跨基金交易日聯集，實際年取樣點數未必等於單一市場之 252，採此方式可正確反映其真實頻率。
+  var periodsPerYear = (years > 0 && rets.length > 0) ? (rets.length / years) : 252;
+  var annVol = Math.sqrt(variance) * Math.sqrt(periodsPerYear) * 100;
   var sharpe = annVol > 0 ? (cagr / annVol) : null;
   var peak = navs[0], maxDd = 0;
   for (var j = 0; j < n; j++) {
@@ -1343,43 +1346,62 @@ function computeStats(dates, navs) {
     cur: last, years: years, n: n, startDate: dates[0], endDate: dates[n - 1]
   };
 }
-// 賺錢機率（滾動視窗勝率）：依持有期間（交易日）分桶，樣本不足(<10)自動跳過
+// 賺錢機率（滾動視窗勝率）：依持有期間（實際年數，依日期回溯而非固定交易日數）分桶，樣本不足(<10)自動跳過
 var WIN_BUCKETS = [
-  { label: '1年',   days: 252 },
-  { label: '2年',   days: 504 },
-  { label: '3年',   days: 756 },
-  { label: '4年',   days: 1008 },
-  { label: '5年',   days: 1260 },
-  { label: '7年',   days: 1764 },
-  { label: '10年',  days: 2520 }
+  { label: '1年',   years: 1 },
+  { label: '2年',   years: 2 },
+  { label: '3年',   years: 3 },
+  { label: '4年',   years: 4 },
+  { label: '5年',   years: 5 },
+  { label: '7年',   years: 7 },
+  { label: '10年',  years: 10 }
 ];
-function computeWinRates(navs) {
+// 找出「dates[i] 往後加 yrs 年」之目標日期，於 dates（已遞增排序）中第一個 ">=" 該日期之索引；找不到回傳 -1。
+// 組合之統一日期軸為跨基金交易日聯集，每年實際資料點數未必等於 252，故改以真實日期回溯定義「N 年」持有期間，
+// 取代先前以固定交易日數位移（如 252、504…）模擬年數的作法。
+function yearOffsetIdx(dates, i, yrs) {
+  var d = new Date(dates[i]);
+  d.setFullYear(d.getFullYear() + yrs);
+  var target = isoDate(d);
+  var lo = i, hi = dates.length - 1, res = -1;
+  while (lo <= hi) {
+    var mid = (lo + hi) >> 1;
+    if (dates[mid] >= target) { res = mid; hi = mid - 1; }
+    else lo = mid + 1;
+  }
+  return res;
+}
+function computeWinRates(dates, navs) {
   var n = navs.length, out = [];
   WIN_BUCKETS.forEach(function(b) {
-    var windows = n - b.days;
-    if (windows < 10) return;
-    var wins = 0;
-    for (var i = 0; i < windows; i++) {
-      if (navs[i + b.days] > navs[i]) wins++;
+    var wins = 0, windows = 0;
+    for (var i = 0; i < n; i++) {
+      var j = yearOffsetIdx(dates, i, b.years);
+      if (j < 0) break; // i 之後目標日期只會更晚，必然同樣找不到對應索引，可提前結束
+      windows++;
+      if (navs[j] > navs[i]) wins++;
     }
+    if (windows < 10) return;
     out.push({ label: b.label, winRate: wins / windows * 100, samples: windows });
   });
   return out;
 }
 // 賺錢機率（單色 vs 雙色）：紅＝淨值（未還原）價格漲跌，藍＝「期末淨值－期初淨值＋期間內配息金額」(不含配息再投資複利效果)
 // divCum[i] = 截至第 i 個交易日（含）為止之累計配息金額；divCum[end]-divCum[start] = 該持有期間內實際收到之配息總額
-function computeWinRatesDual(navs, divCum) {
+function computeWinRatesDual(dates, navs, divCum) {
   var n = navs.length, out = [];
   WIN_BUCKETS.forEach(function(b) {
-    var windows = n - b.days;
-    if (windows < 10) return;
-    var rawWins = 0, addWins = 0;
-    for (var i = 0; i < windows; i++) {
-      var navStart = navs[i], navEnd = navs[i + b.days];
+    var rawWins = 0, addWins = 0, windows = 0;
+    for (var i = 0; i < n; i++) {
+      var j = yearOffsetIdx(dates, i, b.years);
+      if (j < 0) break;
+      windows++;
+      var navStart = navs[i], navEnd = navs[j];
       if (navEnd > navStart) rawWins++;
-      var divInWindow = divCum[i + b.days] - divCum[i];
+      var divInWindow = divCum[j] - divCum[i];
       if (navEnd - navStart + divInWindow > 0) addWins++;
     }
+    if (windows < 10) return;
     out.push({ label: b.label, rawRate: rawWins / windows * 100, addRate: addWins / windows * 100, samples: windows });
   });
   return out;
@@ -1982,10 +2004,11 @@ function pfRenderMain() {
 function renderPfWinRateHtml(s, idxR, period) {
   var startIdx = idxR.startIdx;
   var rawNavs = period.raw;
+  var winDates = s.dates.slice(idxR.startIdx, idxR.endIdx + 1);
   if (period.divOnIdx) {
     var slicedDiv = sliceDivOnIdx(period.divOnIdx, startIdx);
     var divCum = buildDivCum(slicedDiv, rawNavs.length);
-    var winList = computeWinRatesDual(rawNavs, divCum);
+    var winList = computeWinRatesDual(winDates, rawNavs, divCum);
     if (winList.length) {
       return '<div class="bt-section-title">' + ICON.coin + ' 賺錢機率（持有期間滾動勝率：紅＝淨值，藍＝加上配息後）</div>'
         + '<div class="wr-legend"><span><i style="background:#dc2626"></i>淨值（未還原）</span><span><i style="background:#2657a0"></i>加上配息後</span></div>'
@@ -2004,7 +2027,7 @@ function renderPfWinRateHtml(s, idxR, period) {
     }
     return '<div class="bt-section-title">' + ICON.coin + ' 賺錢機率</div><div class="bt-loading" style="padding:14px 0">資料區間過短，尚無法計算任何持有期間之勝率</div>';
   }
-  var rawWin = computeWinRates(rawNavs);
+  var rawWin = computeWinRates(winDates, rawNavs);
   if (rawWin.length) {
     return '<div class="bt-section-title">' + ICON.coin + ' 賺錢機率（持有期間滾動勝率）</div><div class="wr-bars">'
       + rawWin.map(function(w) {
