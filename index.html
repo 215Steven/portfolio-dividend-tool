@@ -1103,16 +1103,17 @@ table.vbct-tbl td.c { text-align: center; }
       <table class="vbct-tbl">
         <thead>
           <tr>
-            <th>基金名稱</th>
-            <th>來源</th>
-            <th>代碼</th>
-            <th>幣別</th>
-            <th class="c">配息頻率</th>
-            <th class="r">當日淨值</th>
+            <th onclick="pfSortBy(0)">基金名稱</th>
+            <th onclick="pfSortBy(1)">來源</th>
+            <th onclick="pfSortBy(2)">代碼</th>
+            <th onclick="pfSortBy(3)">幣別</th>
+            <th onclick="pfSortBy(4)" class="c">配息頻率</th>
+            <th onclick="pfSortBy(5)" class="c">風險<span class="th-sub">RR1～RR5</span></th>
+            <th onclick="pfSortBy(6)" class="r">當日淨值</th>
             <th class="c">操作</th>
           </tr>
         </thead>
-        <tbody id="pf-results-tbody"><tr><td colspan="7" class="pf-empty">載入中...</td></tr></tbody>
+        <tbody id="pf-results-tbody"><tr><td colspan="8" class="pf-empty">載入中...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1578,9 +1579,19 @@ function freqBadge(freq) {
   return '<span class="freq-badge fb-' + freq + '">' + eh(freq) + '</span>';
 }
 // ─────────────────────────────────────────────────────────
+// rrCls（與 vbct/vcct 工具共用之風險等級顏色對應）
+// ─────────────────────────────────────────────────────────
+function rrCls(rr) {
+  return { RR1: 'rr-1', RR2: 'rr-2', RR3: 'rr-3', RR4: 'rr-4', RR5: 'rr-5' }[rr] || '';
+}
+function rrBadge(rr) {
+  if (!rr) return '<span class="freq-none">－</span>';
+  return '<b class="' + rrCls(rr) + '">' + eh(rr) + '</b>';
+}
+// ─────────────────────────────────────────────────────────
 // localStorage 快取（基金清單，每日台灣中午 12 點更新）
 // ─────────────────────────────────────────────────────────
-var FUND_CACHE_KEY = 'portfolio-fundlist-v2';
+var FUND_CACHE_KEY = 'portfolio-fundlist-v3';
 function nextNoonTW() {
   var now = new Date();
   var candidate = new Date(now);
@@ -1621,6 +1632,7 @@ async function fetchFundList(product) {
         cur: f.V26 || '',
         type: (f.V5 || '').replace(/<[^>]+>/g, '').trim(),
         freq: f.V42 || '無',
+        rr: f.V28 || '',
         nav: parseFloat(f.V18) || 0,
         url: getFundUrl(f)
       };
@@ -1666,7 +1678,12 @@ function renderSearchResults() {
       && (!q || f.name.toLowerCase().includes(q) || f.code.toLowerCase().includes(q));
   });
   var total = filtered.length;
-  filtered = filtered.slice().sort(function(a, b) { return a.name.localeCompare(b.name, 'zh-TW'); }).slice(0, 60);
+  if (_pfSortCol >= 0) {
+    filtered = filtered.slice().sort(pfSortComparator);
+  } else {
+    filtered = filtered.slice().sort(function(a, b) { return a.name.localeCompare(b.name, 'zh-TW'); });
+  }
+  filtered = filtered.slice(0, 60);
   var inPortfolio = {};
   _portfolio.forEach(function(p) { inPortfolio[p.key] = true; });
   var rowsHtml = filtered.map(function(f) {
@@ -1680,6 +1697,7 @@ function renderSearchResults() {
       + '<td style="font-family:monospace;font-size:12px;color:#6b7a8d;white-space:nowrap">' + eh(f.code) + '</td>'
       + '<td style="font-size:12px;white-space:nowrap">' + eh(f.cur) + '</td>'
       + '<td class="c">' + freqBadge(f.freq) + '</td>'
+      + '<td class="c">' + rrBadge(f.rr) + '</td>'
       + '<td class="r" style="font-family:monospace;font-size:12px">' + (f.nav || '—') + '</td>'
       + '<td class="c">' + (added
           ? '<span style="color:#16a34a;font-size:11.5px;font-weight:700">已加入</span>'
@@ -1690,7 +1708,34 @@ function renderSearchResults() {
   var noteEl = $('pf-results-note');
   if (noteEl) noteEl.textContent = total > 60 ? ('符合 ' + total + ' 筆，顯示前 60 筆（請輸入關鍵字縮小範圍）') : ('符合 ' + total + ' 筆');
   var tbody = $('pf-results-tbody');
-  if (tbody) tbody.innerHTML = rowsHtml || '<tr><td colspan="7" class="pf-empty">查無符合條件的基金</td></tr>';
+  if (tbody) tbody.innerHTML = rowsHtml || '<tr><td colspan="8" class="pf-empty">查無符合條件的基金</td></tr>';
+  // 標記排序中欄位之箭頭樣式（限搜尋結果表格）
+  var headRow = tbody && tbody.parentElement && tbody.parentElement.querySelector('thead tr');
+  if (headRow) {
+    Array.prototype.forEach.call(headRow.children, function(th, i) {
+      th.classList.remove('sort-asc', 'sort-desc');
+      if (i === _pfSortCol) th.classList.add(_pfSortDir > 0 ? 'sort-asc' : 'sort-desc');
+    });
+  }
+}
+// ─────────────────────────────────────────────────────────
+// 搜尋結果表格排序（點欄位標題排序，0~6；7=操作欄不支援排序）
+// ─────────────────────────────────────────────────────────
+var _pfSortCol = -1, _pfSortDir = 1;
+var PF_SORT_FIELDS = ['name', 'source', 'code', 'cur', 'freq', 'rr', 'nav'];
+function pfSortComparator(a, b) {
+  var field = PF_SORT_FIELDS[_pfSortCol];
+  var av = a[field], bv = b[field];
+  if (typeof av === 'number' || typeof bv === 'number') {
+    return ((av || 0) - (bv || 0)) * _pfSortDir;
+  }
+  av = String(av || ''); bv = String(bv || '');
+  return av.localeCompare(bv, 'zh-TW') * _pfSortDir;
+}
+function pfSortBy(col) {
+  _pfSortDir = (_pfSortCol === col) ? -_pfSortDir : 1;
+  _pfSortCol = col;
+  renderSearchResults();
 }
 // ─────────────────────────────────────────────────────────
 // 組合建立器：加入／移除／權重管理
