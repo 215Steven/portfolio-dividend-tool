@@ -2110,6 +2110,56 @@ function renderPfBreakdown(meta) {
     + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr><th>基金</th><th class="r">權重</th><th class="r">期間報酬（淨值）</th><th class="r">期間配息合計（原幣）</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
 }
 // ─────────────────────────────────────────────────────────
+// 各基金投入金額試算明細：將上方投入金額依目前權重分配至各基金，換算各基金
+// 「買入時／期末」原幣淨值與對應金額、期間總領金額、最新月領金額；
+// 沿用上方相同之不考慮匯率波動假設。
+// ─────────────────────────────────────────────────────────
+function buildPfInvestRows(s, idxR, amt, startMonth, endMonth) {
+  var rows = [];
+  (s.funds || []).forEach(function(f, i) {
+    var m = s.meta && s.meta[i];
+    if (!m) return;
+    var startNav = f.filledRaw[idxR.startIdx];
+    var endNav = f.filledRaw[idxR.endIdx];
+    if (!(startNav > 0)) return;
+    var allocAmt = amt * f.wNorm; // 依目前權重分配之投入金額（萬元）
+    var endAmt = allocAmt * (endNav / startNav); // 期末市值（萬元，未考慮匯率，配息未再投資）
+    var divByMonth = f.divByMonthOwn || {};
+    var allMonthKeys = Object.keys(divByMonth).sort();
+    var periodKeys = allMonthKeys.filter(function(mk) { return mk >= startMonth && mk <= endMonth; });
+    var divSum = periodKeys.reduce(function(acc, mk) { return acc + divByMonth[mk]; }, 0);
+    var divAmt = allocAmt * (divSum / startNav);
+    // 最新月領金額：採各基金資料中「最新一個有配息紀錄之月份」，不受上方期間分頁篩選
+    var lastMonthKey = allMonthKeys.length ? allMonthKeys[allMonthKeys.length - 1] : null;
+    var lastMonthDivAmt = lastMonthKey ? allocAmt * (divByMonth[lastMonthKey] / startNav) : 0;
+    rows.push({
+      name: m.name, source: m.source, wNormPct: m.wNorm,
+      startNav: startNav, endNav: endNav, allocAmt: allocAmt, endAmt: endAmt,
+      divAmt: divAmt, hasDivInPeriod: periodKeys.length > 0,
+      lastMonthKey: lastMonthKey, lastMonthDivAmt: lastMonthDivAmt
+    });
+  });
+  return rows;
+}
+function renderPfInvestRows(rows) {
+  if (!rows.length) return '';
+  var trs = rows.map(function(r) {
+    return '<tr>'
+      + '<td style="max-width:200px;word-break:break-word;line-height:1.4"><span class="src-badge src-' + r.source + '">' + r.source + '</span> ' + eh(r.name) + '</td>'
+      + '<td class="r">' + r.wNormPct.toFixed(1) + '%</td>'
+      + '<td class="r">' + r.allocAmt.toFixed(2) + ' 萬元</td>'
+      + '<td class="r">' + r.startNav.toFixed(4) + '</td>'
+      + '<td class="r">' + r.endNav.toFixed(4) + '</td>'
+      + '<td class="r">' + r.endAmt.toFixed(2) + ' 萬元</td>'
+      + '<td class="r">' + (r.hasDivInPeriod ? r.divAmt.toFixed(2) + ' 萬元' : '無') + '</td>'
+      + '<td class="r">' + (r.lastMonthKey ? eh(r.lastMonthKey) + '：' + r.lastMonthDivAmt.toFixed(2) + ' 萬元' : '無') + '</td>'
+      + '</tr>';
+  }).join('');
+  return '<div class="bt-section-title">' + ICON.list + ' 各基金投入金額試算明細（依目前權重分配上方投入金額）</div>'
+    + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr><th>基金</th><th class="r">權重</th><th class="r">分配投入金額</th><th class="r">買入時淨值（原幣）</th><th class="r">期末淨值（原幣）</th><th class="r">期末市值</th><th class="r">期間總領金額</th><th class="r">最新月領金額</th></tr></thead><tbody>' + trs + '</tbody></table></div>'
+    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 「買入時淨值」「期末淨值」為各基金原始幣別之淨值數字，僅供對照走勢，非新台幣金額；其餘金額欄位則依上方投入金額，按目前各基金權重分配後，分別以各基金自身原幣淨值漲跌幅與配息率換算，並沿用上方相同假設（不考慮匯率波動、配息未再投資）。「期間總領金額」採與上方期間分頁同步之區間；「最新月領金額」則採各基金資料中最新一個有配息紀錄之月份，不受上方期間分頁篩選。</div>';
+}
+// ─────────────────────────────────────────────────────────
 // 投入金額試算：將組合指數點數換算為實際新台幣金額
 // （組合本身已改為依「上方所選期間」起始日重新基準化＝100 點，等同假設於
 //  該起始日依目前權重重新投入金額；採計的配息期間與上方「全部／1年／
@@ -2127,7 +2177,8 @@ function pfRenderInvestEstimate() {
   var period = pfRecomputePeriod(s, idxR.startIdx, idxR.endIdx);
   var startDate = s.dates[idxR.startIdx], endDate = s.dates[idxR.endIdx];
   if (!period.divByMonth) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">所選期間內無配息月份資料可供試算</div>'; return; }
-  var divStats = computeDivStats(period.divByMonth, startDate.substring(0, 7), endDate.substring(0, 7));
+  var startMonth = startDate.substring(0, 7), endMonth = endDate.substring(0, 7);
+  var divStats = computeDivStats(period.divByMonth, startMonth, endMonth);
   if (!divStats.totalCount) { el.innerHTML = '<div class="bt-loading" style="padding:10px 0">所選期間內無配息月份資料可供試算</div>'; return; }
   // 組合本金序列已於 pfRecomputePeriod() 依「上方所選期間」起始日重新基準化（恆為 100 點），
   // 等同假設於選定期間起始日，依目前各基金權重重新一次性投入金額；此處仍以 period.raw[0] 取值
@@ -2143,7 +2194,8 @@ function pfRenderInvestEstimate() {
     + btStat('已領金額（期間合計）', totalAmt.toFixed(2) + ' 萬元')
     + btStat('期間平均月配息', avgAmt.toFixed(2) + ' 萬元')
     + '</div>'
-    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 假設於「' + startDate + '」（即上方所選期間之起始日）依目前各基金權重重新一次性投入上方設定金額，此時組合指數＝' + startIdxLevel.toFixed(4) + ' 點，故每 1 點配息對應「投入金額 ÷ ' + startIdxLevel.toFixed(4) + '」之新台幣金額；上方「已領金額」即為此筆投入於「' + startDate + ' ～ ' + endDate + '」（隨上方期間分頁切換重新計算起始日與基準指數）期間內，配息未再投資之假設下，累計約可領取之新台幣金額，僅為歷史回顧估算，不代表未來實際配息水準，配息來源亦可能部分或全部為本金。本試算與上方「期間配息合計（指數點）」「各基金個別表現」之原幣金額為不同單位，僅此區塊已換算為新台幣參考金額。<b>本試算未考慮外幣與新臺幣間之匯率波動</b>：若組合內含美元／日圓／澳幣／歐元等外幣計價基金，其配息率係直接以原幣淨值計算後套用同一換算基準，等同假設匯率全程不變，與實際入帳金額可能有落差，請審酌參考。</div>';
+    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 假設於「' + startDate + '」（即上方所選期間之起始日）依目前各基金權重重新一次性投入上方設定金額，此時組合指數＝' + startIdxLevel.toFixed(4) + ' 點，故每 1 點配息對應「投入金額 ÷ ' + startIdxLevel.toFixed(4) + '」之新台幣金額；上方「已領金額」即為此筆投入於「' + startDate + ' ～ ' + endDate + '」（隨上方期間分頁切換重新計算起始日與基準指數）期間內，配息未再投資之假設下，累計約可領取之新台幣金額，僅為歷史回顧估算，不代表未來實際配息水準，配息來源亦可能部分或全部為本金。本試算與上方「期間配息合計（指數點）」「各基金個別表現」之原幣金額為不同單位，僅此區塊已換算為新台幣參考金額。<b>本試算未考慮外幣與新臺幣間之匯率波動</b>：若組合內含美元／日圓／澳幣／歐元等外幣計價基金，其配息率係直接以原幣淨值計算後套用同一換算基準，等同假設匯率全程不變，與實際入帳金額可能有落差，請審酌參考。</div>'
+    + renderPfInvestRows(buildPfInvestRows(s, idxR, amt, startMonth, endMonth));
 }
 // Esc 鍵：目前無 Modal 需要關閉，保留供未來擴充
 // ─────────────────────────────────────────────────────────
