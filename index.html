@@ -1792,7 +1792,7 @@ function renderPortfolioList() {
         + '<div class="pf-fund-row-name"><span class="src-badge src-' + p.source + '">' + p.source + '</span>' + eh(p.name) + ' ' + freqBadge(p.freq) + '</div>'
         + '<div class="pf-fund-row-meta">' + eh(p.code) + ' ／ ' + eh(p.cur) + '</div>'
         + '</div>'
-        + '<div class="pf-weight-wrap"><input type="number" class="pf-weight-input" min="0" max="100" step="0.1" value="' + p.weight + '" oninput="updateWeight(\'' + ea(p.key) + '\', this.value)">%</div>'
+        + '<div class="pf-weight-wrap"><input type="number" class="pf-weight-input" min="0" max="100" step="5" value="' + p.weight + '" oninput="updateWeight(\'' + ea(p.key) + '\', this.value)">%</div>'
         + '<button class="pf-remove-btn" onclick="removeFundFromPortfolio(\'' + ea(p.key) + '\')">移除</button>'
         + '</div>';
     }).join('');
