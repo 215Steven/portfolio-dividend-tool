@@ -1921,7 +1921,7 @@ function renderPfAnalysis() {
       + '<div id="pf-invest-result"></div>'
     : '';
   $('pf-analysis-body').innerHTML = excludedNote + divNote + modeToggle + rangeToggle + customRangeHtml
-    + '<div id="pf-main"></div><div id="pf-winrate"></div>' + renderPfBreakdown(s.meta) + investHtml;
+    + '<div id="pf-main"></div><div id="pf-winrate"></div>' + investHtml;
   $('pf-analysis-wrap').style.display = 'block';
   pfRenderMain();
   pfRenderWinRate();
@@ -2092,27 +2092,10 @@ function applyPfCustomRange() {
   pfRenderWinRate();
   pfRenderInvestEstimate();
 }
-function renderPfBreakdown(meta) {
-  if (!meta || !meta.length) return '';
-  var rows = meta.map(function(m) {
-    var retStr = m.stats ? pctStr(m.stats.totalRet) : '—';
-    var retCls = (m.stats && m.stats.totalRet < 0) ? 'ret-neg' : 'ret-pos';
-    var divStr = m.hasDiv ? m.divTotal.toFixed(4) : '無';
-    return '<tr>'
-      + '<td style="max-width:220px;word-break:break-word;line-height:1.4"><span class="src-badge src-' + m.source + '">' + m.source + '</span> ' + eh(m.name) + '</td>'
-      + '<td class="r">' + m.wNorm.toFixed(1) + '%</td>'
-      + '<td class="r"><b class="' + retCls + '">' + retStr + '</b></td>'
-      + '<td class="r">' + divStr + '</td>'
-      + '</tr>';
-  }).join('');
-  return '<div class="bt-section-title">' + ICON.list + ' 各基金個別表現（本金／淨值，依完整重疊區間計算，不隨上方區間切換）</div>'
-    + '<div class="pf-breakdown-note">此欄「期間配息合計」為該基金「原始幣別、原始單位金額」之加總（例如美元基金即為美元金額），未套用權重、也未換算成組合指數點數，與上方「期間配息合計（指數點）」是兩種不同單位、不同計算期間的數字，兩者本來就不會相等、也不能直接相加比較，僅供參考各基金自身配息規模。組合指數點數的換算方式請見下方「投入金額試算」。</div>'
-    + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr><th>基金</th><th class="r">權重</th><th class="r">期間報酬（淨值）</th><th class="r">期間配息合計（原幣）</th></tr></thead><tbody>' + rows + '</tbody></table></div>';
-}
 // ─────────────────────────────────────────────────────────
 // 各基金投入金額試算明細：將上方投入金額依目前權重分配至各基金，換算各基金
-// 「買入時／期末」原幣淨值與對應金額、期間總領金額、最新月領金額；
-// 沿用上方相同之不考慮匯率波動假設。
+// 「買入時／期末」原幣淨值與對應金額、期間報酬、期間總領金額、最新月領金額，
+// 並於表格最後一列加總組合整體金額。沿用上方相同之不考慮匯率波動假設（換算匯率＝1）。
 // ─────────────────────────────────────────────────────────
 function buildPfInvestRows(s, idxR, amt, startMonth, endMonth) {
   var rows = [];
@@ -2124,6 +2107,7 @@ function buildPfInvestRows(s, idxR, amt, startMonth, endMonth) {
     if (!(startNav > 0)) return;
     var allocAmt = amt * f.wNorm; // 依目前權重分配之投入金額（萬元）
     var endAmt = allocAmt * (endNav / startNav); // 期末市值（萬元，未考慮匯率，配息未再投資）
+    var periodRetPct = (endNav / startNav - 1) * 100; // 期間報酬（淨值），與買入時/期末淨值同一期間
     var divByMonth = f.divByMonthOwn || {};
     var allMonthKeys = Object.keys(divByMonth).sort();
     var periodKeys = allMonthKeys.filter(function(mk) { return mk >= startMonth && mk <= endMonth; });
@@ -2134,7 +2118,7 @@ function buildPfInvestRows(s, idxR, amt, startMonth, endMonth) {
     var lastMonthDivAmt = lastMonthKey ? allocAmt * (divByMonth[lastMonthKey] / startNav) : 0;
     rows.push({
       name: m.name, source: m.source, wNormPct: m.wNorm,
-      startNav: startNav, endNav: endNav, allocAmt: allocAmt, endAmt: endAmt,
+      startNav: startNav, endNav: endNav, allocAmt: allocAmt, endAmt: endAmt, periodRetPct: periodRetPct,
       divAmt: divAmt, hasDivInPeriod: periodKeys.length > 0,
       lastMonthKey: lastMonthKey, lastMonthDivAmt: lastMonthDivAmt
     });
@@ -2144,20 +2128,39 @@ function buildPfInvestRows(s, idxR, amt, startMonth, endMonth) {
 function renderPfInvestRows(rows) {
   if (!rows.length) return '';
   var trs = rows.map(function(r) {
+    var retCls = r.periodRetPct < 0 ? 'ret-neg' : 'ret-pos';
     return '<tr>'
       + '<td style="max-width:200px;word-break:break-word;line-height:1.4"><span class="src-badge src-' + r.source + '">' + r.source + '</span> ' + eh(r.name) + '</td>'
       + '<td class="r">' + r.wNormPct.toFixed(1) + '%</td>'
       + '<td class="r">' + r.allocAmt.toFixed(2) + ' 萬元</td>'
       + '<td class="r">' + r.startNav.toFixed(4) + '</td>'
       + '<td class="r">' + r.endNav.toFixed(4) + '</td>'
+      + '<td class="r"><b class="' + retCls + '">' + pctStr(r.periodRetPct) + '</b></td>'
       + '<td class="r">' + r.endAmt.toFixed(2) + ' 萬元</td>'
       + '<td class="r">' + (r.hasDivInPeriod ? r.divAmt.toFixed(2) + ' 萬元' : '無') + '</td>'
       + '<td class="r">' + (r.lastMonthKey ? eh(r.lastMonthKey) + '：' + r.lastMonthDivAmt.toFixed(2) + ' 萬元' : '無') + '</td>'
       + '</tr>';
   }).join('');
+  var sumAlloc = rows.reduce(function(a, r) { return a + r.allocAmt; }, 0);
+  var sumEndAmt = rows.reduce(function(a, r) { return a + r.endAmt; }, 0);
+  var sumDivAmt = rows.reduce(function(a, r) { return a + (r.hasDivInPeriod ? r.divAmt : 0); }, 0);
+  var sumLastMonthDivAmt = rows.reduce(function(a, r) { return a + (r.lastMonthKey ? r.lastMonthDivAmt : 0); }, 0);
+  var totalRetPct = sumAlloc > 0 ? (sumEndAmt / sumAlloc - 1) * 100 : 0;
+  var totalRetCls = totalRetPct < 0 ? 'ret-neg' : 'ret-pos';
+  var totalRow = '<tr>'
+    + '<td><b>組合加總</b></td>'
+    + '<td class="r"><b>100.0%</b></td>'
+    + '<td class="r"><b>' + sumAlloc.toFixed(2) + ' 萬元</b></td>'
+    + '<td class="r">－</td>'
+    + '<td class="r">－</td>'
+    + '<td class="r"><b class="' + totalRetCls + '">' + pctStr(totalRetPct) + '</b></td>'
+    + '<td class="r"><b>' + sumEndAmt.toFixed(2) + ' 萬元</b></td>'
+    + '<td class="r"><b>' + sumDivAmt.toFixed(2) + ' 萬元</b></td>'
+    + '<td class="r"><b>' + sumLastMonthDivAmt.toFixed(2) + ' 萬元</b></td>'
+    + '</tr>';
   return '<div class="bt-section-title">' + ICON.list + ' 各基金投入金額試算明細（依目前權重分配上方投入金額）</div>'
-    + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr><th>基金</th><th class="r">權重</th><th class="r">分配投入金額</th><th class="r">買入時淨值（原幣）</th><th class="r">期末淨值（原幣）</th><th class="r">期末市值</th><th class="r">期間總領金額</th><th class="r">最新月領金額</th></tr></thead><tbody>' + trs + '</tbody></table></div>'
-    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 「買入時淨值」「期末淨值」為各基金原始幣別之淨值數字，僅供對照走勢，非新台幣金額；其餘金額欄位則依上方投入金額，按目前各基金權重分配後，分別以各基金自身原幣淨值漲跌幅與配息率換算，並沿用上方相同假設（不考慮匯率波動、配息未再投資）。「期間總領金額」採與上方期間分頁同步之區間；「最新月領金額」則採各基金資料中最新一個有配息紀錄之月份，不受上方期間分頁篩選。</div>';
+    + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr><th>基金</th><th class="r">權重</th><th class="r">分配投入金額</th><th class="r">買入時淨值（原幣）</th><th class="r">期末淨值（原幣）</th><th class="r">期間報酬（淨值）</th><th class="r">期末市值</th><th class="r">期間總領金額</th><th class="r">最新月領金額</th></tr></thead><tbody>' + trs + totalRow + '</tbody></table></div>'
+    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 「買入時淨值」「期末淨值」為各基金原始幣別之淨值數字，僅供對照走勢，非新台幣金額；其餘金額欄位依上方投入金額按目前權重分配後，以各基金自身原幣淨值漲跌幅與配息率換算，配息未再投資。「期間總領金額」與上方期間分頁同步；「最新月領金額」採各基金資料中最新一個有配息紀錄之月份，各基金月份可能不同，不受期間分頁篩選。<b>換算匯率：1</b>（外幣原幣金額直接視為等額新台幣金額，未實際換算匯率，與實際入帳金額可能有落差，請審酌參考）。表格最後一列「組合加總」為各基金金額欄位加總；期間報酬則為加總後期末市值與加總投入金額之比較。</div>';
 }
 // ─────────────────────────────────────────────────────────
 // 投入金額試算：將組合指數點數換算為實際新台幣金額
@@ -2188,13 +2191,12 @@ function pfRenderInvestEstimate() {
   var totalAmt = divStats.total * pointValue;
   var avgAmt = totalAmt / divStats.totalCount;
   el.innerHTML = '<div class="bt-stats-grid">'
-    + btStat('換算基準', '每點＝' + pointValue.toFixed(4) + ' 萬元')
     + btStat('試算期間', startDate + ' ～ ' + endDate)
     + btStat('期間配息月數', divStats.totalCount + ' 個月')
     + btStat('已領金額（期間合計）', totalAmt.toFixed(2) + ' 萬元')
     + btStat('期間平均月配息', avgAmt.toFixed(2) + ' 萬元')
     + '</div>'
-    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 假設於「' + startDate + '」（即上方所選期間之起始日）依目前各基金權重重新一次性投入上方設定金額，此時組合指數＝' + startIdxLevel.toFixed(4) + ' 點，故每 1 點配息對應「投入金額 ÷ ' + startIdxLevel.toFixed(4) + '」之新台幣金額；上方「已領金額」即為此筆投入於「' + startDate + ' ～ ' + endDate + '」（隨上方期間分頁切換重新計算起始日與基準指數）期間內，配息未再投資之假設下，累計約可領取之新台幣金額，僅為歷史回顧估算，不代表未來實際配息水準，配息來源亦可能部分或全部為本金。本試算與上方「期間配息合計（指數點）」「各基金個別表現」之原幣金額為不同單位，僅此區塊已換算為新台幣參考金額。<b>本試算未考慮外幣與新臺幣間之匯率波動</b>：若組合內含美元／日圓／澳幣／歐元等外幣計價基金，其配息率係直接以原幣淨值計算後套用同一換算基準，等同假設匯率全程不變，與實際入帳金額可能有落差，請審酌參考。</div>'
+    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 假設於「' + startDate + '」（即上方所選期間之起始日）依目前各基金權重重新一次性投入上方設定金額，上方「已領金額」為此筆投入於「' + startDate + ' ～ ' + endDate + '」期間內，配息未再投資之假設下，累計約可領取之新台幣金額，僅為歷史回顧估算，不代表未來實際配息水準，配息來源亦可能部分或全部為本金。<b>換算匯率：1</b>（外幣原幣金額直接視為等額新台幣金額，未實際換算匯率，與實際入帳金額可能有落差，請審酌參考）。</div>'
     + renderPfInvestRows(buildPfInvestRows(s, idxR, amt, startMonth, endMonth));
 }
 // Esc 鍵：目前無 Modal 需要關閉，保留供未來擴充
