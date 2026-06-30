@@ -1451,11 +1451,11 @@ function buildNavChartSvg(dates, navsPrimary, navsSecondary, labelPrimary, label
   var secondarySvg = '', legendSvg = '';
   if (hasSecondary) {
     var ptsS = ptsFor(navsSecondary);
-    secondarySvg = '<polyline points="' + ptsS + '" fill="none" stroke="#c47f17" stroke-width="1.4" stroke-dasharray="5,3" opacity="0.9"/>';
+    secondarySvg = '<polyline points="' + ptsS + '" fill="none" stroke="#c47f17" stroke-width="1.6"/>';
     legendSvg = '<g font-size="9.5">'
       + '<line x1="' + (w - 232) + '" y1="9" x2="' + (w - 220) + '" y2="9" stroke="#2657a0" stroke-width="2.4"/>'
       + '<text x="' + (w - 215) + '" y="12" fill="#475569">' + eh(labelPrimary || '淨值（未還原）') + '</text>'
-      + '<line x1="' + (w - 118) + '" y1="9" x2="' + (w - 106) + '" y2="9" stroke="#c47f17" stroke-width="2.4" stroke-dasharray="4,2"/>'
+      + '<line x1="' + (w - 118) + '" y1="9" x2="' + (w - 106) + '" y2="9" stroke="#c47f17" stroke-width="2.4"/>'
       + '<text x="' + (w - 101) + '" y="12" fill="#475569">' + eh(labelSecondary || '還原(含息)') + '</text>'
       + '</g>';
   }
