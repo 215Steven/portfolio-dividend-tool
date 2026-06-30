@@ -829,7 +829,24 @@ table.vbct-tbl td.c { text-align: center; }
 .wr-pct { width: 48px; flex-shrink: 0; text-align: right; font-weight: 800; color: var(--text); font-family: 'Courier New',monospace; }
 .bt-wr-note { font-size: 10.5px; color: #b0b8c4; margin-top: 8px; }
 /* 還原(含息)模式切換 */
-.bt-mode-toggle { display: flex; gap: 6px; margin-bottom: 4px; }
+.bt-mode-toggle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 4px; }
+.bt-asof-note { font-size: 11px; color: var(--muted); white-space: nowrap; margin-left: 2px; }
+.bt-export-row { display: flex; justify-content: flex-end; margin: -6px 0 14px; }
+.bt-export-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: var(--navy);
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 6px 10px;
+  border-radius: 7px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  transition: background 0.15s, border-color 0.15s;
+}
+.bt-export-btn:hover { background: #eef2f8; border-color: var(--navy); }
 .bt-mode-btn {
   flex: 1;
   border: 1px solid var(--border);
@@ -1196,7 +1213,8 @@ const ICON = {
   zap:     '<svg class="i" viewBox="0 0 24 24"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>',
   list:    '<svg class="i" viewBox="0 0 24 24"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1" ry="1"/></svg>',
   coin:    '<svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="6" x2="12" y2="18"/><path d="M15 9.5a2.5 2.5 0 0 0-2.5-2.5h-1A2.5 2.5 0 0 0 9 9.5c0 1.38 1.12 2.1 2.5 2.5l1 .29c1.38.39 2.5 1.1 2.5 2.4A2.5 2.5 0 0 1 12.5 17h-1A2.5 2.5 0 0 1 9 14.5"/></svg>',
-  loader:  '<svg class="i i-spin" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>'
+  loader:  '<svg class="i i-spin" viewBox="0 0 24 24"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>',
+  download:'<svg class="i" viewBox="0 0 24 24"><path d="M12 3v12"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/></svg>'
 };
 // ─────────────────────────────────────────────────────────
 // fetchBig5 via CORS Proxy
@@ -1407,17 +1425,21 @@ function computeWinRatesDual(dates, navs, divCum) {
   });
   return out;
 }
-// 手繪 SVG 淨值走勢圖（含期間最高／最低標記）
-function buildNavChartSvg(dates, navs) {
-  var w = 640, h = 220, padL = 46, padR = 10, padT = 14, padB = 24;
-  var n = navs.length;
+// 手繪 SVG 淨值走勢圖（可選擇疊加第二條序列同框比較，並含期間最高／最低標記）
+function buildNavChartSvg(dates, navsPrimary, navsSecondary, labelPrimary, labelSecondary) {
+  var hasSecondary = !!(navsSecondary && navsSecondary.length === navsPrimary.length);
+  var w = 640, h = hasSecondary ? 234 : 220, padL = 46, padR = 10, padT = hasSecondary ? 28 : 14, padB = 24;
+  var n = navsPrimary.length;
   if (n < 2) return '<div class="bt-loading">資料不足，無法繪製走勢圖</div>';
-  var minV = Math.min.apply(null, navs), maxV = Math.max.apply(null, navs);
+  var allVals = hasSecondary ? navsPrimary.concat(navsSecondary) : navsPrimary;
+  var minV = Math.min.apply(null, allVals), maxV = Math.max.apply(null, allVals);
   var range = (maxV - minV) || 1;
   var xf = function(i) { return padL + i / (n - 1) * (w - padL - padR); };
   var yf = function(v) { return padT + (1 - (v - minV) / range) * (h - padT - padB); };
-  var pts = navs.map(function(v, i) { return xf(i).toFixed(1) + ',' + yf(v).toFixed(1); }).join(' ');
-  var maxI = navs.indexOf(maxV), minI = navs.indexOf(minV);
+  function ptsFor(arr) { return arr.map(function(v, i) { return xf(i).toFixed(1) + ',' + yf(v).toFixed(1); }).join(' '); }
+  var ptsP = ptsFor(navsPrimary);
+  var maxVP = Math.max.apply(null, navsPrimary), minVP = Math.min.apply(null, navsPrimary);
+  var maxIp = navsPrimary.indexOf(maxVP), minIp = navsPrimary.indexOf(minVP);
   var gridLines = '', gridLabels = '';
   for (var g = 0; g <= 4; g++) {
     var gv = minV + range * g / 4;
@@ -1425,16 +1447,74 @@ function buildNavChartSvg(dates, navs) {
     gridLines += '<line x1="' + padL + '" y1="' + gy.toFixed(1) + '" x2="' + (w - padR) + '" y2="' + gy.toFixed(1) + '" stroke="#eef2f8" stroke-width="1"/>';
     gridLabels += '<text x="' + (padL - 6) + '" y="' + (gy + 3).toFixed(1) + '" font-size="9" fill="#94a3b8" text-anchor="end">' + gv.toFixed(2) + '</text>';
   }
-  var areaPts = 'M' + xf(0).toFixed(1) + ',' + (h - padB) + ' L' + pts.split(' ').join(' L') + ' L' + xf(n - 1).toFixed(1) + ',' + (h - padB) + ' Z';
-  return '<svg viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:auto;display:block">'
+  var areaPts = 'M' + xf(0).toFixed(1) + ',' + (h - padB) + ' L' + ptsP.split(' ').join(' L') + ' L' + xf(n - 1).toFixed(1) + ',' + (h - padB) + ' Z';
+  var secondarySvg = '', legendSvg = '';
+  if (hasSecondary) {
+    var ptsS = ptsFor(navsSecondary);
+    secondarySvg = '<polyline points="' + ptsS + '" fill="none" stroke="#c47f17" stroke-width="1.4" stroke-dasharray="5,3" opacity="0.9"/>';
+    legendSvg = '<g font-size="9.5">'
+      + '<line x1="' + (w - 232) + '" y1="9" x2="' + (w - 220) + '" y2="9" stroke="#2657a0" stroke-width="2.4"/>'
+      + '<text x="' + (w - 215) + '" y="12" fill="#475569">' + eh(labelPrimary || '淨值（未還原）') + '</text>'
+      + '<line x1="' + (w - 118) + '" y1="9" x2="' + (w - 106) + '" y2="9" stroke="#c47f17" stroke-width="2.4" stroke-dasharray="4,2"/>'
+      + '<text x="' + (w - 101) + '" y="12" fill="#475569">' + eh(labelSecondary || '還原(含息)') + '</text>'
+      + '</g>';
+  }
+  return '<svg id="pf-chart-svg" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h + '" style="width:100%;height:auto;display:block;background:#fff">'
+    + legendSvg
     + gridLines + gridLabels
+    + secondarySvg
     + '<path d="' + areaPts + '" fill="rgba(38,87,160,0.08)" stroke="none"/>'
-    + '<polyline points="' + pts + '" fill="none" stroke="#2657a0" stroke-width="1.6"/>'
-    + '<circle cx="' + xf(maxI).toFixed(1) + '" cy="' + yf(maxV).toFixed(1) + '" r="3.5" fill="#dc2626"/>'
-    + '<circle cx="' + xf(minI).toFixed(1) + '" cy="' + yf(minV).toFixed(1) + '" r="3.5" fill="#16a34a"/>'
+    + '<polyline points="' + ptsP + '" fill="none" stroke="#2657a0" stroke-width="1.6"/>'
+    + '<circle cx="' + xf(maxIp).toFixed(1) + '" cy="' + yf(maxVP).toFixed(1) + '" r="3.5" fill="#dc2626"/>'
+    + '<circle cx="' + xf(minIp).toFixed(1) + '" cy="' + yf(minVP).toFixed(1) + '" r="3.5" fill="#16a34a"/>'
     + '<text x="' + xf(0).toFixed(1) + '" y="' + (h - 6) + '" font-size="9" fill="#94a3b8">' + dates[0] + '</text>'
     + '<text x="' + (w - padR - 58) + '" y="' + (h - 6) + '" font-size="9" fill="#94a3b8">' + dates[n - 1] + '</text>'
     + '</svg>';
+}
+// 將目前走勢圖（SVG）匯出為 PNG 圖片並觸發下載
+function exportPfChartImage() {
+  var svgEl = document.getElementById('pf-chart-svg');
+  if (!svgEl) { alert('請先建立組合分析後再匯出'); return; }
+  var asofEl = $('pf-asof-note');
+  var asofText = (asofEl && asofEl.textContent) || '';
+  var svgData = new XMLSerializer().serializeToString(svgEl);
+  var svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+  var url = URL.createObjectURL(svgBlob);
+  var img = new Image();
+  img.onload = function() {
+    var scale = 2, titleH = 36;
+    var w = svgEl.width.baseVal.value, h = svgEl.height.baseVal.value;
+    var canvas = document.createElement('canvas');
+    canvas.width = w * scale;
+    canvas.height = (h + titleH) * scale;
+    var ctx = canvas.getContext('2d');
+    ctx.scale(scale, scale);
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, w, h + titleH);
+    ctx.fillStyle = '#1f2d3d';
+    ctx.font = '600 13px "Noto Sans TC", -apple-system, sans-serif';
+    ctx.fillText('組合分析工具（非官方）－淨值走勢', 10, 18);
+    ctx.fillStyle = '#7c8696';
+    ctx.font = '11px "Noto Sans TC", -apple-system, sans-serif';
+    ctx.fillText(asofText, 10, 31);
+    ctx.drawImage(img, 0, titleH, w, h);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(function(blob) {
+      if (!blob) { alert('圖片匯出失敗，請重試'); return; }
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = '組合淨值走勢_' + new Date().toISOString().slice(0, 10) + '.png';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(function() { URL.revokeObjectURL(a.href); }, 1000);
+    }, 'image/png');
+  };
+  img.onerror = function() {
+    URL.revokeObjectURL(url);
+    alert('圖片匯出失敗，請重試');
+  };
+  img.src = url;
 }
 function pctStr(v, digits) {
   if (v === null || v === undefined || isNaN(v)) return '—';
@@ -1933,14 +2013,16 @@ function renderPfAnalysis() {
   var s = _pfState;
   if (!s) return;
   var divNote = s.hasAnyDiv
-    ? '<div class="bt-div-note">' + ICON.coin + ' 已將各基金歷史配息依權重併入「還原(含息)」組合序列（假設配息發生於當月最後一個交易日，並按當時淨值滾入計算，含再投資複利效果）。可用下方按鈕切換顯示淨值（未還原）或還原(含息)結果。下方「賺錢機率」則改用較單純之「淨值變化＋配息金額」方式計算。</div>'
+    ? '<div class="bt-div-note">' + ICON.coin + ' 已將各基金歷史配息依權重併入「還原(含息)」組合序列（假設配息發生於當月最後一個交易日，並按當時淨值滾入計算，含再投資複利效果）。下方走勢圖已同時疊加顯示「淨值（未還原）」與「還原(含息)」兩條線，按下方按鈕可切換粗實線（主線）並同步更新下方統計數據。下方「賺錢機率」則改用較單純之「淨值變化＋配息金額」方式計算。</div>'
     : '';
   var modeToggle = s.hasAnyDiv
     ? '<div class="bt-mode-toggle" id="pf-mode-toggle">'
       + '<button class="bt-mode-btn active" data-mode="raw" onclick="setPfMode(\'raw\')">' + ICON.chart + ' 淨值（未還原）</button>'
       + '<button class="bt-mode-btn" data-mode="adj" onclick="setPfMode(\'adj\')">' + ICON.coin + ' 還原(含息)</button>'
+      + '<span class="bt-asof-note" id="pf-asof-note"></span>'
       + '</div>'
     : '';
+  var exportRow = '<div class="bt-export-row"><button class="bt-export-btn" id="pf-export-btn" onclick="exportPfChartImage()">' + ICON.download + ' 匯出走勢圖（PNG）</button></div>';
   var rangeToggle = '<div class="bt-range-toggle" id="pf-range-toggle">'
     + '<button class="bt-range-btn" data-range="" onclick="setPfRange(null)">全部</button>'
     + '<button class="bt-range-btn" data-range="1" onclick="setPfRange(1)">1年</button>'
@@ -1965,7 +2047,7 @@ function renderPfAnalysis() {
       + '<span>萬元（新台幣，假設於上方所選期間之起始日整筆投入）</span></div>'
       + '<div id="pf-invest-result"></div>'
     : '';
-  $('pf-analysis-body').innerHTML = excludedNote + divNote + modeToggle + rangeToggle + customRangeHtml
+  $('pf-analysis-body').innerHTML = excludedNote + divNote + modeToggle + rangeToggle + customRangeHtml + exportRow
     + '<div id="pf-main"></div><div id="pf-winrate"></div>' + investHtml;
   $('pf-analysis-wrap').style.display = 'block';
   pfRenderMain();
@@ -2022,12 +2104,16 @@ function pfRenderMain() {
   var idxR = resolveRangeIndices(s.dates, s.range, s.customStart, s.customEnd);
   var period = pfRecomputePeriod(s, idxR.startIdx, idxR.endIdx);
   var dates = s.dates.slice(idxR.startIdx, idxR.endIdx + 1);
-  var navs = s.mode === 'adj' && period.adj ? period.adj : period.raw;
+  var hasBoth = !!period.adj;
+  var navs = s.mode === 'adj' && hasBoth ? period.adj : period.raw;
   var stats = computeStats(dates, navs);
   var el = $('pf-main');
   if (!el) return;
   if (!stats) { el.innerHTML = '<div class="bt-loading">' + ICON.warn + ' 資料不足無法計算</div>'; return; }
-  var chartHtml = buildNavChartSvg(dates, navs);
+  var secondaryNavs = hasBoth ? (s.mode === 'adj' ? period.raw : period.adj) : null;
+  var primaryLabel = (hasBoth && s.mode === 'adj') ? '還原(含息)' : '淨值（未還原）';
+  var secondaryLabel = (hasBoth && s.mode === 'adj') ? '淨值（未還原）' : '還原(含息)';
+  var chartHtml = buildNavChartSvg(dates, navs, secondaryNavs, primaryLabel, secondaryLabel);
   var hasDivData = !!period.divByMonth;
   var divStats = hasDivData ? computeDivStats(period.divByMonth, dates[0].substring(0, 7), dates[dates.length - 1].substring(0, 7)) : { total: 0, adjCount: null, totalCount: 0 };
   var divTotalStr = hasDivData ? divStats.total.toFixed(4) : '無';
@@ -2045,6 +2131,8 @@ function pfRenderMain() {
     + btStat('配息調整次數', divFreqStr)
     + '</div>';
   el.innerHTML = '<div class="bt-meta">資料區間：' + stats.startDate + ' ～ ' + stats.endDate + '　（' + stats.n + ' 個交易日；組合以上方所選期間起始日 = 100 重新依目前權重基準化呈現，本金與配息分開計算）</div>' + chartHtml + statsHtml;
+  var asofEl = $('pf-asof-note');
+  if (asofEl) asofEl.textContent = '（資料至 ' + stats.endDate + '）';
 }
 function renderPfWinRateHtml(s, idxR, period) {
   var startIdx = idxR.startIdx;
