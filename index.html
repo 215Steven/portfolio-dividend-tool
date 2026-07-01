@@ -818,6 +818,7 @@ table.vbct-tbl td.c { text-align: center; }
 }
 .bt-stat-label { font-size: 10px; color: var(--muted); font-weight: 700; margin-bottom: 3px; }
 .bt-stat-val { font-size: 14px; font-weight: 800; color: var(--navy); font-family: 'Courier New',monospace; }
+.bt-stat-note { font-size: 9px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
 .bt-section-title { font-size: 12.5px; font-weight: 800; color: var(--navy); margin: 16px 0 10px; display: flex; align-items: center; gap: 6px; }
 @keyframes bt-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 #bt-main > *, #bt-winrate > * { animation: bt-fade-in 0.22s ease; }
@@ -1353,16 +1354,17 @@ function computeStats(dates, navs) {
   var periodsPerYear = (years > 0 && rets.length > 0) ? (rets.length / years) : 252;
   var annVol = Math.sqrt(variance) * Math.sqrt(periodsPerYear) * 100;
   var sharpe = annVol > 0 ? (cagr / annVol) : null;
-  var peak = navs[0], maxDd = 0;
+  var peak = navs[0], maxDd = 0, peakIdx = 0, mddPeakIdx = 0, mddTroughIdx = 0;
   for (var j = 0; j < n; j++) {
-    if (navs[j] > peak) peak = navs[j];
+    if (navs[j] > peak) { peak = navs[j]; peakIdx = j; }
     var dd = (navs[j] - peak) / peak;
-    if (dd < maxDd) maxDd = dd;
+    if (dd < maxDd) { maxDd = dd; mddPeakIdx = peakIdx; mddTroughIdx = j; }
   }
   return {
     totalRet: totalRet, cagr: cagr, annVol: annVol, sharpe: sharpe,
     mdd: maxDd * 100, high: Math.max.apply(null, navs), low: Math.min.apply(null, navs),
-    cur: last, years: years, n: n, startDate: dates[0], endDate: dates[n - 1]
+    cur: last, years: years, n: n, startDate: dates[0], endDate: dates[n - 1],
+    mddStartDate: dates[mddPeakIdx], mddEndDate: dates[mddTroughIdx]
   };
 }
 // 賺錢機率（滾動視窗勝率）：依持有期間（實際年數，依日期回溯而非固定交易日數）分桶，樣本不足(<10)自動跳過
@@ -1471,12 +1473,25 @@ function buildNavChartSvg(dates, navsPrimary, navsSecondary, labelPrimary, label
     + '<text x="' + (w - padR - 58) + '" y="' + (h - 6) + '" font-size="9" fill="#94a3b8">' + dates[n - 1] + '</text>'
     + '</svg>';
 }
-// 將目前走勢圖（SVG）匯出為 PNG 圖片並觸發下載
+// 將目前走勢圖（SVG）＋統計數據匯出為 PNG 圖片並觸發下載
 function exportPfChartImage() {
   var svgEl = document.getElementById('pf-chart-svg');
   if (!svgEl) { alert('請先建立組合分析後再匯出'); return; }
   var asofEl = $('pf-asof-note');
   var asofText = (asofEl && asofEl.textContent) || '';
+  // 收集統計數據格
+  var statsData = [];
+  document.querySelectorAll('#pf-main .bt-stats-grid .bt-stat').forEach(function(el) {
+    var lblEl = el.querySelector('.bt-stat-label');
+    var valEl = el.querySelector('.bt-stat-val');
+    var noteEl = el.querySelector('.bt-stat-note');
+    statsData.push({
+      label: lblEl ? lblEl.textContent : '',
+      val:   valEl ? valEl.textContent : '',
+      note:  noteEl ? noteEl.textContent : '',
+      isNeg: valEl ? valEl.classList.contains('ret-neg') : false
+    });
+  });
   var svgData = new XMLSerializer().serializeToString(svgEl);
   var svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
   var url = URL.createObjectURL(svgBlob);
@@ -1484,21 +1499,50 @@ function exportPfChartImage() {
   img.onload = function() {
     var scale = 2, titleH = 36;
     var w = svgEl.width.baseVal.value, h = svgEl.height.baseVal.value;
+    var cols = 5, cellW = Math.floor(w / cols), cellH = 52;
+    var rows = Math.ceil(statsData.length / cols);
+    var statsH = rows > 0 ? (rows * cellH + 12) : 0;
     var canvas = document.createElement('canvas');
     canvas.width = w * scale;
-    canvas.height = (h + titleH) * scale;
+    canvas.height = (titleH + h + statsH) * scale;
     var ctx = canvas.getContext('2d');
     ctx.scale(scale, scale);
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, w, h + titleH);
+    ctx.fillRect(0, 0, w, titleH + h + statsH);
+    // 標題列
     ctx.fillStyle = '#1f2d3d';
     ctx.font = '600 13px "Noto Sans TC", -apple-system, sans-serif';
     ctx.fillText('組合分析工具（非官方）－淨值走勢', 10, 18);
     ctx.fillStyle = '#7c8696';
     ctx.font = '11px "Noto Sans TC", -apple-system, sans-serif';
     ctx.fillText(asofText, 10, 31);
+    // 走勢圖
     ctx.drawImage(img, 0, titleH, w, h);
     URL.revokeObjectURL(url);
+    // 統計數據格
+    if (statsData.length) {
+      var sy = titleH + h + 8;
+      statsData.forEach(function(s, i) {
+        var col = i % cols, row = Math.floor(i / cols);
+        var cx = col * cellW + 3, cy = sy + row * cellH;
+        ctx.fillStyle = '#f7fafd';
+        ctx.fillRect(cx, cy, cellW - 5, cellH - 5);
+        ctx.strokeStyle = '#dde3ec';
+        ctx.lineWidth = 0.5;
+        ctx.strokeRect(cx, cy, cellW - 5, cellH - 5);
+        ctx.fillStyle = '#64748b';
+        ctx.font = '700 9px "Noto Sans TC", -apple-system, sans-serif';
+        ctx.fillText(s.label, cx + 5, cy + 13);
+        ctx.fillStyle = s.isNeg ? '#dc2626' : '#1f2d3d';
+        ctx.font = '800 13px "Courier New", monospace';
+        ctx.fillText(s.val, cx + 5, cy + 29);
+        if (s.note) {
+          ctx.fillStyle = '#94a3b8';
+          ctx.font = '9px "Noto Sans TC", -apple-system, sans-serif';
+          ctx.fillText(s.note, cx + 5, cy + 43);
+        }
+      });
+    }
     canvas.toBlob(function(blob) {
       if (!blob) { alert('圖片匯出失敗，請重試'); return; }
       var a = document.createElement('a');
@@ -1521,9 +1565,10 @@ function pctStr(v, digits) {
   digits = digits === undefined ? 2 : digits;
   return (v >= 0 ? '+' : '') + v.toFixed(digits) + '%';
 }
-function btStat(label, val, neg) {
+function btStat(label, val, neg, note) {
   var cls = neg === undefined ? '' : (neg ? 'ret-neg' : 'ret-pos');
-  return '<div class="bt-stat"><div class="bt-stat-label">' + eh(label) + '</div><div class="bt-stat-val ' + cls + '">' + val + '</div></div>';
+  var noteHtml = note ? '<div class="bt-stat-note">' + eh(note) + '</div>' : '';
+  return '<div class="bt-stat"><div class="bt-stat-label">' + eh(label) + '</div><div class="bt-stat-val ' + cls + '">' + val + '</div>' + noteHtml + '</div>';
 }
 // 抓取單一標的「全部」配息記錄（不限近6月），供回測還原使用
 async function fetchDividendHistory(r) {
@@ -2123,7 +2168,7 @@ function pfRenderMain() {
     + btStat('年化報酬', pctStr(stats.cagr), stats.cagr < 0)
     + btStat('年化波動度', stats.annVol.toFixed(2) + '%')
     + btStat('夏普比率', stats.sharpe === null ? '—' : stats.sharpe.toFixed(2))
-    + btStat('最大回撤', pctStr(stats.mdd), true)
+    + btStat('最大回撤', pctStr(stats.mdd), true, stats.mddStartDate + ' ～ ' + stats.mddEndDate)
     + btStat('期間最高', stats.high.toFixed(4))
     + btStat('期間最低', stats.low.toFixed(4))
     + btStat('目前指數', stats.cur.toFixed(4))
