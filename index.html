@@ -818,7 +818,7 @@ table.vbct-tbl td.c { text-align: center; }
 }
 .bt-stat-label { font-size: 10px; color: var(--muted); font-weight: 700; margin-bottom: 3px; }
 .bt-stat-val { font-size: 14px; font-weight: 800; color: var(--navy); font-family: 'Courier New',monospace; }
-.bt-stat-note { font-size: 9px; color: var(--muted); margin-top: 3px; line-height: 1.3; }
+.bt-stat-inline-note { font-size: 11px; font-weight: 500; color: var(--muted); font-family: -apple-system, sans-serif; margin-left: 6px; white-space: nowrap; vertical-align: middle; }
 .bt-section-title { font-size: 12.5px; font-weight: 800; color: var(--navy); margin: 16px 0 10px; display: flex; align-items: center; gap: 6px; }
 @keyframes bt-fade-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
 #bt-main > *, #bt-winrate > * { animation: bt-fade-in 0.22s ease; }
@@ -1484,11 +1484,19 @@ function exportPfChartImage() {
   document.querySelectorAll('#pf-main .bt-stats-grid .bt-stat').forEach(function(el) {
     var lblEl = el.querySelector('.bt-stat-label');
     var valEl = el.querySelector('.bt-stat-val');
-    var noteEl = el.querySelector('.bt-stat-note');
+    var noteEl = el.querySelector('.bt-stat-inline-note');
+    // 取 val 的純文字節點（排除行內 note span）
+    var valText = '';
+    if (valEl) {
+      for (var c = 0; c < valEl.childNodes.length; c++) {
+        if (valEl.childNodes[c].nodeType === 3) valText += valEl.childNodes[c].nodeValue;
+      }
+      valText = valText.trim();
+    }
     statsData.push({
       label: lblEl ? lblEl.textContent : '',
-      val:   valEl ? valEl.textContent : '',
-      note:  noteEl ? noteEl.textContent : '',
+      val:   valText,
+      note:  noteEl ? noteEl.textContent.trim() : '',
       isNeg: valEl ? valEl.classList.contains('ret-neg') : false
     });
   });
@@ -1565,10 +1573,10 @@ function pctStr(v, digits) {
   digits = digits === undefined ? 2 : digits;
   return (v >= 0 ? '+' : '') + v.toFixed(digits) + '%';
 }
-function btStat(label, val, neg, note) {
+function btStat(label, val, neg, inlineNote) {
   var cls = neg === undefined ? '' : (neg ? 'ret-neg' : 'ret-pos');
-  var noteHtml = note ? '<div class="bt-stat-note">' + eh(note) + '</div>' : '';
-  return '<div class="bt-stat"><div class="bt-stat-label">' + eh(label) + '</div><div class="bt-stat-val ' + cls + '">' + val + '</div>' + noteHtml + '</div>';
+  var noteHtml = inlineNote ? '<span class="bt-stat-inline-note">' + eh(inlineNote) + '</span>' : '';
+  return '<div class="bt-stat"><div class="bt-stat-label">' + eh(label) + '</div><div class="bt-stat-val ' + cls + '">' + val + noteHtml + '</div></div>';
 }
 // 抓取單一標的「全部」配息記錄（不限近6月），供回測還原使用
 async function fetchDividendHistory(r) {
