@@ -1879,7 +1879,7 @@ function addFundToPortfolio(key) {
   if (_portfolio.some(function(p) { return p.key === key; })) return;
   var f = (window._fundUniverse || []).find(function(x) { return x.key === key; });
   if (!f) return;
-  _portfolio.push({ key: f.key, source: f.source, v40: f.v40, v41: f.v41, name: f.name, code: f.code, cur: f.cur, freq: f.freq, weight: 0 });
+  _portfolio.push({ key: f.key, source: f.source, v40: f.v40, v41: f.v41, name: f.name, code: f.code, cur: f.cur, nav: f.nav, freq: f.freq, weight: 0 });
   if (!_weightsDirty) equalizeWeights(); else renderPortfolioList();
   renderSearchResults();
 }
@@ -2041,7 +2041,7 @@ async function buildPortfolio() {
       var sMonth = axis[0].substring(0, 7), eMonth = axis[axis.length - 1].substring(0, 7);
       var ownDivTotal = 0;
       divMonthKeys.forEach(function(mk) { if (mk >= sMonth && mk <= eMonth) ownDivTotal += divByMonthOwn[mk]; });
-      meta.push({ name: r.p.name, source: r.p.source, code: r.p.code, weight: r.p.weight || 0, wNorm: wNorm * 100, stats: ownStats, hasDiv: divMonthKeys.length > 0, divTotal: ownDivTotal, cur: r.p.cur, freq: r.p.freq });
+      meta.push({ name: r.p.name, source: r.p.source, code: r.p.code, weight: r.p.weight || 0, wNorm: wNorm * 100, stats: ownStats, hasDiv: divMonthKeys.length > 0, divTotal: ownDivTotal, nav: r.p.nav, cur: r.p.cur, freq: r.p.freq });
     });
     _pfState = {
       dates: axis,
@@ -2404,11 +2404,11 @@ function pfRenderTodayDiv() {
   s.funds.forEach(function(f, i) {
     var m = s.meta && s.meta[i];
     if (!m) return;
-    var cur = parseFloat(m.cur);
+    var nav = parseFloat(m.nav);
     var divByMonth = f.divByMonthOwn || {};
     var monthKeys = Object.keys(divByMonth).sort();
-    if (!monthKeys.length || !(cur > 0)) {
-      rows.push({ name: m.name, source: m.source, wNormPct: m.wNorm, wNorm: f.wNorm, cur: cur, annDiv: 0, annYield: 0, annIncome: 0, periods: 0, hasDiv: false });
+    if (!monthKeys.length || !(nav > 0)) {
+      rows.push({ name: m.name, source: m.source, wNormPct: m.wNorm, wNorm: f.wNorm, nav: nav, annDiv: 0, annYield: 0, annIncome: 0, periods: 0, hasDiv: false });
       return;
     }
     // 取最近 12 個有配息月份加總，不足 12 月時依可取得月數年化
@@ -2416,12 +2416,12 @@ function pfRenderTodayDiv() {
     var last12Sum = last12Keys.reduce(function(acc, mk) { return acc + divByMonth[mk]; }, 0);
     var periods = last12Keys.length;
     var annDiv = periods > 0 ? last12Sum * (12 / periods) : 0;
-    var annYield = annDiv / cur * 100;
+    var annYield = annDiv / nav * 100;
     var allocAmt = hasAmt ? amt * f.wNorm : 0;
-    var annIncome = allocAmt * (annDiv / cur);
+    var annIncome = allocAmt * (annDiv / nav);
     rows.push({
       name: m.name, source: m.source, wNormPct: m.wNorm, wNorm: f.wNorm,
-      cur: cur, annDiv: annDiv, annYield: annYield,
+      nav: nav, annDiv: annDiv, annYield: annYield,
       annIncome: annIncome, periods: periods, hasDiv: true
     });
   });
@@ -2439,7 +2439,7 @@ function pfRenderTodayDiv() {
     return '<tr>'
       + '<td style="max-width:200px;word-break:break-word;line-height:1.4"><span class="src-badge src-' + r.source + '">' + r.source + '</span> ' + eh(r.name) + '</td>'
       + '<td class="r">' + r.wNormPct.toFixed(1) + '%</td>'
-      + '<td class="r">' + (r.cur > 0 ? r.cur : '—') + '</td>'
+      + '<td class="r">' + (r.nav > 0 ? r.nav : '—') + '</td>'
       + '<td class="r">' + (r.hasDiv ? r.annDiv.toFixed(4) + periodsNote : '無配息') + '</td>'
       + '<td class="r">' + (r.hasDiv ? '<b class="ret-pos">' + r.annYield.toFixed(2) + '%</b>' : '—') + '</td>'
       + incomeCell
