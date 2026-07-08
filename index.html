@@ -2041,7 +2041,7 @@ async function buildPortfolio() {
       var sMonth = axis[0].substring(0, 7), eMonth = axis[axis.length - 1].substring(0, 7);
       var ownDivTotal = 0;
       divMonthKeys.forEach(function(mk) { if (mk >= sMonth && mk <= eMonth) ownDivTotal += divByMonthOwn[mk]; });
-      meta.push({ name: r.p.name, source: r.p.source, code: r.p.code, weight: r.p.weight || 0, wNorm: wNorm * 100, stats: ownStats, hasDiv: divMonthKeys.length > 0, divTotal: ownDivTotal });
+      meta.push({ name: r.p.name, source: r.p.source, code: r.p.code, weight: r.p.weight || 0, wNorm: wNorm * 100, stats: ownStats, hasDiv: divMonthKeys.length > 0, divTotal: ownDivTotal, cur: r.p.cur, freq: r.p.freq });
     });
     _pfState = {
       dates: axis,
@@ -2096,16 +2096,17 @@ function renderPfAnalysis() {
   var investHtml = s.hasAnyDivMonth
     ? '<div class="bt-section-title">' + ICON.coin + ' 投入金額試算（已領金額，與上方期間分頁同步）</div>'
       + '<div class="pf-invest-row"><label for="pf-invest-amt">投入金額</label>'
-      + '<input type="number" id="pf-invest-amt" class="pf-weight-input" min="1" step="1" value="100" oninput="pfRenderInvestEstimate()">'
+      + '<input type="number" id="pf-invest-amt" class="pf-weight-input" min="1" step="1" value="100" oninput="pfRenderInvestEstimate();pfRenderTodayDiv()">'
       + '<span>萬元（新台幣，假設於上方所選期間之起始日整筆投入）</span></div>'
       + '<div id="pf-invest-result"></div>'
     : '';
   $('pf-analysis-body').innerHTML = excludedNote + divNote + modeToggle + rangeToggle + customRangeHtml + exportRow
-    + '<div id="pf-main"></div><div id="pf-winrate"></div>' + investHtml;
+    + '<div id="pf-main"></div><div id="pf-winrate"></div>' + investHtml + '<div id="pf-today-div"></div>';
   $('pf-analysis-wrap').style.display = 'block';
   pfRenderMain();
   pfRenderWinRate();
   pfRenderInvestEstimate();
+  pfRenderTodayDiv();
   $('pf-analysis-wrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 // ─────────────────────────────────────────────────────────
@@ -2384,6 +2385,84 @@ function pfRenderInvestEstimate() {
     + '</div>'
     + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 假設於「' + startDate + '」（即上方所選期間之起始日）依目前各基金權重重新一次性投入上方設定金額，上方「已領金額」為此筆投入於「' + startDate + ' ～ ' + endDate + '」期間內，配息未再投資之假設下，累計約可領取之新台幣金額，僅為歷史回顧估算，不代表未來實際配息水準，配息來源亦可能部分或全部為本金。<b>換算匯率：1</b>（外幣原幣金額直接視為等額新台幣金額，未實際換算匯率，與實際入帳金額可能有落差，請審酌參考）。</div>'
     + renderPfInvestRows(buildPfInvestRows(s, idxR, amt, startMonth, endMonth));
+}
+// ─────────────────────────────────────────────────────────
+// 今日進場預估年化配息：以各基金當前淨值（加入時掛牌）與近12個月配息紀錄
+// 估算如果今天依目前權重進場的年化配息率與預估年配息金額
+// ─────────────────────────────────────────────────────────
+function pfRenderTodayDiv() {
+  var s = _pfState;
+  var el = $('pf-today-div');
+  if (!s || !el) return;
+  if (!s.hasAnyDivMonth) { el.innerHTML = ''; return; }
+
+  var amtEl = $('pf-invest-amt');
+  var amt = amtEl ? parseFloat(amtEl.value) : NaN;
+  var hasAmt = amt > 0;
+
+  var rows = [];
+  s.funds.forEach(function(f, i) {
+    var m = s.meta && s.meta[i];
+    if (!m) return;
+    var cur = parseFloat(m.cur);
+    var divByMonth = f.divByMonthOwn || {};
+    var monthKeys = Object.keys(divByMonth).sort();
+    if (!monthKeys.length || !(cur > 0)) {
+      rows.push({ name: m.name, source: m.source, wNormPct: m.wNorm, wNorm: f.wNorm, cur: cur, annDiv: 0, annYield: 0, annIncome: 0, periods: 0, hasDiv: false });
+      return;
+    }
+    // 取最近 12 個有配息月份加總，不足 12 月時依可取得月數年化
+    var last12Keys = monthKeys.slice(-12);
+    var last12Sum = last12Keys.reduce(function(acc, mk) { return acc + divByMonth[mk]; }, 0);
+    var periods = last12Keys.length;
+    var annDiv = periods > 0 ? last12Sum * (12 / periods) : 0;
+    var annYield = annDiv / cur * 100;
+    var allocAmt = hasAmt ? amt * f.wNorm : 0;
+    var annIncome = allocAmt * (annDiv / cur);
+    rows.push({
+      name: m.name, source: m.source, wNormPct: m.wNorm, wNorm: f.wNorm,
+      cur: cur, annDiv: annDiv, annYield: annYield,
+      annIncome: annIncome, periods: periods, hasDiv: true
+    });
+  });
+
+  if (!rows.length) { el.innerHTML = ''; return; }
+
+  // 加權年化配息率（依各基金權重加權）
+  var sumWeightedYield = rows.reduce(function(a, r) { return a + (r.hasDiv ? r.annYield * r.wNorm : 0); }, 0);
+  var sumAnnIncome = hasAmt ? rows.reduce(function(a, r) { return a + (r.hasDiv ? r.annIncome : 0); }, 0) : 0;
+
+  var incomeHeader = hasAmt ? '<th class="r">預估年配息金額</th>' : '';
+  var trs = rows.map(function(r) {
+    var incomeCell = hasAmt ? '<td class="r">' + (r.hasDiv ? r.annIncome.toFixed(2) + ' 萬元' : '無') + '</td>' : '';
+    var periodsNote = (r.hasDiv && r.periods < 12) ? '<span style="font-size:10px;color:var(--muted)">（近' + r.periods + '月年化）</span>' : '';
+    return '<tr>'
+      + '<td style="max-width:200px;word-break:break-word;line-height:1.4"><span class="src-badge src-' + r.source + '">' + r.source + '</span> ' + eh(r.name) + '</td>'
+      + '<td class="r">' + r.wNormPct.toFixed(1) + '%</td>'
+      + '<td class="r">' + (r.cur > 0 ? r.cur : '—') + '</td>'
+      + '<td class="r">' + (r.hasDiv ? r.annDiv.toFixed(4) + periodsNote : '無配息') + '</td>'
+      + '<td class="r">' + (r.hasDiv ? '<b class="ret-pos">' + r.annYield.toFixed(2) + '%</b>' : '—') + '</td>'
+      + incomeCell
+      + '</tr>';
+  }).join('');
+
+  var totalIncomeCell = hasAmt ? '<td class="r"><b>' + sumAnnIncome.toFixed(2) + ' 萬元</b></td>' : '';
+  var totalRow = '<tr>'
+    + '<td><b>組合加權</b></td>'
+    + '<td class="r"><b>100.0%</b></td>'
+    + '<td class="r">—</td>'
+    + '<td class="r">—</td>'
+    + '<td class="r"><b class="ret-pos">' + sumWeightedYield.toFixed(2) + '%</b></td>'
+    + totalIncomeCell
+    + '</tr>';
+
+  el.innerHTML = '<div class="bt-section-title">' + ICON.coin + ' 今日進場預估年化配息（以當前淨值計算）</div>'
+    + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr>'
+    + '<th>基金</th><th class="r">權重</th><th class="r">當前淨值（原幣）</th>'
+    + '<th class="r">預估年化配息／單位</th><th class="r">預估年化配息率</th>'
+    + incomeHeader
+    + '</tr></thead><tbody>' + trs + totalRow + '</tbody></table></div>'
+    + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 「預估年化配息／單位」採該基金最近 12 個有配息月份之合計金額（不足 12 個月則依可取得月數年化）；「預估年化配息率」＝年化配息額 ÷ 當前淨值；「組合加權」配息率為各基金依正規化權重加權之平均值。若有輸入投入金額，「預估年配息金額」為依該金額投入後之估算年化配息收入（未考慮匯率，外幣原幣直接視為等額新台幣）。預估值僅供參考，過去配息不代表未來將持續，配息來源可能部分或全部為本金。</div>';
 }
 // Esc 鍵：目前無 Modal 需要關閉，保留供未來擴充
 // ─────────────────────────────────────────────────────────
