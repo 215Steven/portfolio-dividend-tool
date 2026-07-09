@@ -2400,11 +2400,15 @@ function pfRenderTodayDiv() {
   var amt = amtEl ? parseFloat(amtEl.value) : NaN;
   var hasAmt = amt > 0;
 
+  // 使用已抓取的每日淨值序列最後一筆（共同日期軸最後一日）
+  var lastNavDate = s.dates[s.dates.length - 1];
+
   var rows = [];
   s.funds.forEach(function(f, i) {
     var m = s.meta && s.meta[i];
     if (!m) return;
-    var nav = parseFloat(m.nav);
+    // 用 filledRaw 最後一筆（比 fund list 預載的 nav 更精確）
+    var nav = f.filledRaw ? f.filledRaw[f.filledRaw.length - 1] : parseFloat(m.nav);
     var divByMonth = f.divByMonthOwn || {};
     var monthKeys = Object.keys(divByMonth).sort();
     if (!monthKeys.length || !(nav > 0)) {
@@ -2437,7 +2441,7 @@ function pfRenderTodayDiv() {
     return '<tr>'
       + '<td style="max-width:200px;word-break:break-word;line-height:1.4"><span class="src-badge src-' + r.source + '">' + r.source + '</span> ' + eh(r.name) + '</td>'
       + '<td class="r">' + r.wNormPct.toFixed(1) + '%</td>'
-      + '<td class="r">' + (r.nav > 0 ? r.nav : '—') + '</td>'
+      + '<td class="r">' + (r.nav > 0 ? r.nav.toFixed(4) : '—') + '</td>'
       + '<td class="r">' + (r.hasDiv ? r.latestDiv.toFixed(4) + monthNote : '無配息') + '</td>'
       + '<td class="r">' + (r.hasDiv ? '<b class="ret-pos">' + r.monthYield.toFixed(2) + '%</b>' : '—') + '</td>'
       + incomeCell
@@ -2454,9 +2458,9 @@ function pfRenderTodayDiv() {
     + totalIncomeCell
     + '</tr>';
 
-  el.innerHTML = '<div class="bt-section-title">' + ICON.coin + ' 今日進場預估月配息（以當前淨值計算）</div>'
+  el.innerHTML = '<div class="bt-section-title">' + ICON.coin + ' 今日進場預估月配息（淨值日期：' + lastNavDate + '）</div>'
     + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr>'
-    + '<th>基金</th><th class="r">權重</th><th class="r">當前淨值（原幣）</th>'
+    + '<th>基金</th><th class="r">權重</th><th class="r">淨值（' + lastNavDate + '）</th>'
     + '<th class="r">最新月配息／單位</th><th class="r">預估月配息率</th>'
     + incomeHeader
     + '</tr></thead><tbody>' + trs + totalRow + '</tbody></table></div>'
