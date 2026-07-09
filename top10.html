@@ -448,7 +448,9 @@ function renderRetTable(data) {
 
 function esc(s) {
   if (!s) return '';
-  return String(s)
+  // Strip HTML tags first (fund names may contain <span> warning text)
+  const stripped = String(s).replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+  return stripped
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;');
