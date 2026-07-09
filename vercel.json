@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/vcct-top10",
+      "schedule": "0 4 * * *"
+    }
+  ]
+}

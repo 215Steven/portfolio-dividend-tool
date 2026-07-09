@@ -1,0 +1,493 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VCCT 基金排行榜 TOP 10</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: #2e3347;
+    --text: #e2e8f0;
+    --text-dim: #8892a4;
+    --text-muted: #555f72;
+    --accent: #4f7cff;
+    --accent-dim: #2d4bb3;
+    --gold: #f5c518;
+    --silver: #a8b8c8;
+    --bronze: #c87832;
+    --green: #22c55e;
+    --red: #ef4444;
+    --rr1: #10b981; --rr1-bg: #10b98118;
+    --rr2: #06b6d4; --rr2-bg: #06b6d418;
+    --rr3: #4f7cff; --rr3-bg: #4f7cff18;
+    --rr4: #f59e0b; --rr4-bg: #f59e0b18;
+    --rr5: #ef4444; --rr5-bg: #ef444418;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { scroll-behavior: smooth; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang TC', 'Microsoft JhengHei', sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ── */
+  .header {
+    background: linear-gradient(135deg, #111827 0%, #1a1d27 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 28px 24px 20px;
+    text-align: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(10px);
+  }
+  .header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #fff;
+  }
+  .header h1 span { color: var(--accent); }
+  .header-meta {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .header-meta .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-muted); }
+
+  /* ── Nav ── */
+  .nav-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 14px 24px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .nav-tabs a {
+    text-decoration: none;
+    color: var(--text-dim);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 14px;
+    font-size: 13px;
+    white-space: nowrap;
+    transition: all 0.15s;
+  }
+  .nav-tabs a:hover { color: var(--text); border-color: var(--accent); }
+
+  /* ── Main content ── */
+  .content { max-width: 960px; margin: 0 auto; padding: 28px 16px 60px; }
+
+  /* ── Section ── */
+  .section { margin-bottom: 48px; }
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .section-icon { font-size: 24px; line-height: 1; }
+  .section-title { font-size: 18px; font-weight: 700; color: #fff; }
+  .section-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── Table ── */
+  .table-wrap { overflow-x: auto; border-radius: 12px; border: 1px solid var(--border); }
+  table { width: 100%; border-collapse: collapse; }
+  thead th {
+    background: var(--surface2);
+    color: var(--text-dim);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 10px 14px;
+    text-align: left;
+    white-space: nowrap;
+    border-bottom: 1px solid var(--border);
+  }
+  thead th.r { text-align: right; }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.12s;
+  }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: var(--surface); }
+  tbody td { padding: 11px 14px; vertical-align: middle; }
+  tbody td.r { text-align: right; font-variant-numeric: tabular-nums; }
+
+  /* ── Rank badge ── */
+  .rank {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .rank.gold   { background: rgba(245,197,24,0.15); color: var(--gold); }
+  .rank.silver { background: rgba(168,184,200,0.15); color: var(--silver); }
+  .rank.bronze { background: rgba(200,120,50,0.15); color: var(--bronze); }
+  .rank.normal { background: var(--surface2); color: var(--text-dim); font-size: 12px; }
+
+  /* ── Fund name ── */
+  .fund-name { font-weight: 600; color: var(--text); font-size: 13.5px; }
+  .fund-code { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── RR badge ── */
+  .rr-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+  }
+  .rr-RR1 { background: var(--rr1-bg); color: var(--rr1); border: 1px solid var(--rr1); }
+  .rr-RR2 { background: var(--rr2-bg); color: var(--rr2); border: 1px solid var(--rr2); }
+  .rr-RR3 { background: var(--rr3-bg); color: var(--rr3); border: 1px solid var(--rr3); }
+  .rr-RR4 { background: var(--rr4-bg); color: var(--rr4); border: 1px solid var(--rr4); }
+  .rr-RR5 { background: var(--rr5-bg); color: var(--rr5); border: 1px solid var(--rr5); }
+  .rr-unknown { background: var(--surface2); color: var(--text-muted); border: 1px solid var(--border); }
+
+  /* ── Value colors ── */
+  .val-pos { color: var(--green); }
+  .val-neg { color: var(--red); }
+  .val-hi  { color: var(--gold); font-weight: 700; }
+  .val-dim { color: var(--text-muted); }
+
+  /* ── Freq badge ── */
+  .freq-badge {
+    display: inline-block;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: var(--surface2);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+
+  /* ── Loading / Error ── */
+  .loading-state, .error-state {
+    text-align: center;
+    padding: 60px 24px;
+    color: var(--text-muted);
+  }
+  .loading-spinner {
+    width: 36px; height: 36px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-icon { font-size: 36px; margin-bottom: 12px; }
+  .error-msg { color: var(--red); font-size: 13px; margin-top: 6px; }
+
+  /* ── Footer info ── */
+  .info-bar {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin-bottom: 32px;
+    font-size: 12px;
+    color: var(--text-muted);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 24px;
+    align-items: center;
+  }
+  .info-bar strong { color: var(--text-dim); }
+  .status-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--green);
+    margin-right: 5px;
+  }
+
+  /* ── Back link ── */
+  .back-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+    text-decoration: none;
+    font-size: 13px;
+    margin-bottom: 24px;
+    transition: opacity 0.15s;
+  }
+  .back-link:hover { opacity: 0.75; }
+
+  /* ── Responsive ── */
+  @media (max-width: 640px) {
+    .header { padding: 20px 16px 14px; }
+    .header h1 { font-size: 18px; }
+    .content { padding: 20px 12px 48px; }
+    .section-title { font-size: 15px; }
+    thead th, tbody td { padding: 9px 10px; font-size: 12px; }
+    .fund-name { font-size: 12.5px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🏆 VCCT 基金排行榜 <span>TOP 10</span></h1>
+  <div class="header-meta">
+    <span id="hdr-updated">載入中…</span>
+    <div class="dot"></div>
+    <span>資料來源：<a href="https://vcct-dividend-tool.vercel.app/" target="_blank" style="color:var(--accent);text-decoration:none;">VCCT 配息工具</a></span>
+    <div class="dot"></div>
+    <span>每日中午 12:00 自動更新</span>
+  </div>
+</div>
+
+<nav class="nav-tabs">
+  <a href="#rate">💰 年化配息率 TOP 10</a>
+  <a href="#ret3y">🚀 三年總報酬 TOP 10</a>
+  <a href="#rr3">⭐ RR3 三年報酬 TOP 10</a>
+  <a href="/">← 回主頁</a>
+</nav>
+
+<div class="content">
+  <a class="back-link" href="/">← 回投組配息工具</a>
+
+  <div id="info-bar" class="info-bar" style="display:none">
+    <span><span class="status-dot"></span> <strong>資料狀態：</strong>正常</span>
+    <span id="info-fetched"></span>
+    <span id="info-generated"></span>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading" class="loading-state">
+    <div class="loading-spinner"></div>
+    <div>資料載入中，請稍候…</div>
+  </div>
+
+  <!-- Error -->
+  <div id="error" class="error-state" style="display:none">
+    <div class="error-icon">⚠️</div>
+    <div>無法取得排行榜資料</div>
+    <div class="error-msg" id="error-msg"></div>
+    <div style="margin-top:16px">
+      <button onclick="loadData()" style="background:var(--accent);color:#fff;border:none;padding:8px 20px;border-radius:8px;cursor:pointer;font-size:13px;">重新載入</button>
+    </div>
+  </div>
+
+  <!-- Data sections -->
+  <div id="sections" style="display:none">
+
+    <!-- Section 1: 年化配息率 TOP 10 -->
+    <div class="section" id="rate">
+      <div class="section-header">
+        <div class="section-icon">💰</div>
+        <div>
+          <div class="section-title">年化配息率 TOP 10</div>
+          <div class="section-sub">月配息基金 × 近 6 個月平均配息 × 12 ÷ 淨值</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:42px">#</th>
+              <th>基金名稱</th>
+              <th>幣別</th>
+              <th>風險</th>
+              <th class="r">年化配息率</th>
+              <th class="r">一年報酬</th>
+              <th class="r">三年報酬</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-rate"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 2: 三年總報酬 TOP 10 -->
+    <div class="section" id="ret3y">
+      <div class="section-header">
+        <div class="section-icon">🚀</div>
+        <div>
+          <div class="section-title">三年總報酬率 TOP 10</div>
+          <div class="section-sub">全部 VCCT 基金・三年累積報酬率排名</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:42px">#</th>
+              <th>基金名稱</th>
+              <th>幣別</th>
+              <th>風險</th>
+              <th>配息</th>
+              <th class="r">三年報酬</th>
+              <th class="r">一年報酬</th>
+              <th class="r">年化配息率</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-ret3y"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Section 3: RR3 三年報酬 TOP 10 -->
+    <div class="section" id="rr3">
+      <div class="section-header">
+        <div class="section-icon">⭐</div>
+        <div>
+          <div class="section-title">RR3 三年總報酬率 TOP 10</div>
+          <div class="section-sub">僅限風險等級 RR3 基金・三年累積報酬率排名</div>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:42px">#</th>
+              <th>基金名稱</th>
+              <th>幣別</th>
+              <th>風險</th>
+              <th>配息</th>
+              <th class="r">三年報酬</th>
+              <th class="r">一年報酬</th>
+              <th class="r">年化配息率</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-rr3"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /sections -->
+</div>
+
+<script>
+const API_URL = '/api/vcct-top10';
+
+function rankBadge(n) {
+  if (n === 1) return '<span class="rank gold">🥇</span>';
+  if (n === 2) return '<span class="rank silver">🥈</span>';
+  if (n === 3) return '<span class="rank bronze">🥉</span>';
+  return '<span class="rank normal">' + n + '</span>';
+}
+
+function rrBadge(rr) {
+  const cls = rr && rr.match(/^RR[1-5]$/) ? 'rr-' + rr : 'rr-unknown';
+  return '<span class="rr-badge ' + cls + '">' + (rr || '?') + '</span>';
+}
+
+function pct(v, hi) {
+  if (v == null) return '<span class="val-dim">—</span>';
+  const s = (v >= 0 ? '+' : '') + v.toFixed(2) + '%';
+  if (hi && v > 15) return '<span class="val-hi">' + s + '</span>';
+  return '<span class="' + (v >= 0 ? 'val-pos' : 'val-neg') + '">' + s + '</span>';
+}
+
+function freqBadge(freq) {
+  if (!freq || freq === '無') return '<span class="val-dim">—</span>';
+  return '<span class="freq-badge">' + freq + '</span>';
+}
+
+function renderRateTable(data) {
+  return data.map(f => `
+    <tr>
+      <td>${rankBadge(f.rank)}</td>
+      <td>
+        <div class="fund-name">${esc(f.name)}</div>
+        <div class="fund-code">${esc(f.code)}</div>
+      </td>
+      <td>${esc(f.cur || '—')}</td>
+      <td>${rrBadge(f.rr)}</td>
+      <td class="r">${f.rate != null ? '<span class="val-hi">' + f.rate.toFixed(2) + '%</span>' : '<span class="val-dim">—</span>'}</td>
+      <td class="r">${pct(f.ret1y)}</td>
+      <td class="r">${pct(f.ret3y, true)}</td>
+    </tr>
+  `).join('');
+}
+
+function renderRetTable(data) {
+  return data.map(f => `
+    <tr>
+      <td>${rankBadge(f.rank)}</td>
+      <td>
+        <div class="fund-name">${esc(f.name)}</div>
+        <div class="fund-code">${esc(f.code)}</div>
+      </td>
+      <td>${esc(f.cur || '—')}</td>
+      <td>${rrBadge(f.rr)}</td>
+      <td>${freqBadge(f.freq)}</td>
+      <td class="r">${pct(f.ret3y, true)}</td>
+      <td class="r">${pct(f.ret1y)}</td>
+      <td class="r">${f.rate != null ? f.rate.toFixed(2) + '%' : '<span class="val-dim">—</span>'}</td>
+    </tr>
+  `).join('');
+}
+
+function esc(s) {
+  if (!s) return '';
+  return String(s)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+async function loadData() {
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('error').style.display = 'none';
+  document.getElementById('sections').style.display = 'none';
+
+  try {
+    const resp = await fetch(API_URL);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    // Render tables
+    document.getElementById('tbody-rate').innerHTML = renderRateTable(data.top10Rate || []);
+    document.getElementById('tbody-ret3y').innerHTML = renderRetTable(data.top10Ret3y || []);
+    document.getElementById('tbody-rr3').innerHTML = renderRetTable(data.top10Ret3yRR3 || []);
+
+    // Info bar
+    const fetched = data.fetchedAt ? '資料抓取：' + data.fetchedAt : '';
+    const generated = data.generatedAt ? '計算時間：' + data.generatedAt : '';
+    document.getElementById('info-fetched').textContent = fetched;
+    document.getElementById('info-generated').textContent = generated;
+    document.getElementById('info-bar').style.display = 'flex';
+    document.getElementById('hdr-updated').textContent = data.generatedAt ? '更新於 ' + data.generatedAt : '已更新';
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('sections').style.display = 'block';
+  } catch (e) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error-msg').textContent = e.message;
+    document.getElementById('error').style.display = 'block';
+  }
+}
+
+loadData();
+</script>
+</body>
+</html>
