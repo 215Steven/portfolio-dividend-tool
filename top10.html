@@ -6,25 +6,25 @@
 <title>VCCT 基金排行榜 TOP 10</title>
 <style>
   :root {
-    --bg: #0f1117;
-    --surface: #1a1d27;
-    --surface2: #22263a;
-    --border: #2e3347;
-    --text: #e2e8f0;
-    --text-dim: #8892a4;
-    --text-muted: #555f72;
-    --accent: #4f7cff;
-    --accent-dim: #2d4bb3;
-    --gold: #f5c518;
-    --silver: #a8b8c8;
-    --bronze: #c87832;
-    --green: #22c55e;
-    --red: #ef4444;
-    --rr1: #10b981; --rr1-bg: #10b98118;
-    --rr2: #06b6d4; --rr2-bg: #06b6d418;
-    --rr3: #4f7cff; --rr3-bg: #4f7cff18;
-    --rr4: #f59e0b; --rr4-bg: #f59e0b18;
-    --rr5: #ef4444; --rr5-bg: #ef444418;
+    --bg: #f8fafc;
+    --surface: #ffffff;
+    --surface2: #f1f5f9;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --text-dim: #475569;
+    --text-muted: #94a3b8;
+    --accent: #2563eb;
+    --accent-dim: #1d4ed8;
+    --gold: #d97706;
+    --silver: #64748b;
+    --bronze: #92400e;
+    --green: #16a34a;
+    --red: #dc2626;
+    --rr1: #059669; --rr1-bg: #05966912;
+    --rr2: #0891b2; --rr2-bg: #0891b212;
+    --rr3: #2563eb; --rr3-bg: #2563eb12;
+    --rr4: #d97706; --rr4-bg: #d9770612;
+    --rr5: #dc2626; --rr5-bg: #dc262612;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html { scroll-behavior: smooth; }
@@ -39,7 +39,7 @@
 
   /* ── Header ── */
   .header {
-    background: linear-gradient(135deg, #111827 0%, #1a1d27 100%);
+    background: linear-gradient(135deg, #ffffff 0%, #f0f6ff 100%);
     border-bottom: 1px solid var(--border);
     padding: 28px 24px 20px;
     text-align: center;
@@ -47,12 +47,13 @@
     top: 0;
     z-index: 100;
     backdrop-filter: blur(10px);
+    box-shadow: 0 1px 8px rgba(37,99,235,0.08);
   }
   .header h1 {
     font-size: 22px;
     font-weight: 700;
     letter-spacing: 0.5px;
-    color: #fff;
+    color: var(--text);
   }
   .header h1 span { color: var(--accent); }
   .header-meta {
@@ -104,7 +105,7 @@
     border-bottom: 1px solid var(--border);
   }
   .section-icon { font-size: 24px; line-height: 1; }
-  .section-title { font-size: 18px; font-weight: 700; color: #fff; }
+  .section-title { font-size: 18px; font-weight: 700; color: var(--text); }
   .section-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
   /* ── Table ── */
