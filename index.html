@@ -425,11 +425,20 @@ table.vbct-tbl td.c { text-align: center; }
 .rate-l { color: #16a34a; font-weight: 700; } /* <5%  低 */
 .rate-x { color: #d1d5db; }                    /* 無資料 */
 /* RR risk level colors */
-.rr-1 { color: #16a34a; font-weight: 700; }
-.rr-2 { color: #22c55e; font-weight: 700; }
-.rr-3 { color: #ca8a04; font-weight: 700; }
-.rr-4 { color: #f97316; font-weight: 700; }
-.rr-5 { color: #ef4444; font-weight: 700; }
+.rr-1, .rr-2, .rr-3, .rr-4, .rr-5 {
+  display: inline-block;
+  padding: 2px 7px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  vertical-align: middle;
+}
+.rr-1 { background: #16a34a12; color: #16a34a; border: 1px solid #16a34a; }
+.rr-2 { background: #22c55e12; color: #22c55e; border: 1px solid #22c55e; }
+.rr-3 { background: #ca8a0412; color: #ca8a04; border: 1px solid #ca8a04; }
+.rr-4 { background: #f9731612; color: #f97316; border: 1px solid #f97316; }
+.rr-5 { background: #ef444412; color: #ef4444; border: 1px solid #ef4444; }
 /* Return rate color coding */
 .ret-pos { color: #1d4ed8; font-weight: 700; } /* 正報酬 */
 .ret-neg { color: #dc2626; font-weight: 700; } /* 負報酬 */
@@ -1027,6 +1036,22 @@ table.vbct-tbl td.c { text-align: center; }
   text-align: right;
   font-family: monospace;
 }
+.pf-step-btn {
+  width: 26px; height: 32px;
+  border: 1px solid var(--border);
+  background: var(--surface); color: var(--text);
+  border-radius: 6px; cursor: pointer;
+  font-size: 16px; font-weight: 700; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: background 0.12s, color 0.12s; flex-shrink: 0;
+}
+.pf-step-btn:hover { background: var(--blue-pale); color: var(--blue); border-color: var(--blue-mid); }
+.pf-step-btn:active { transform: scale(0.93); }
+.pf-search-scroll {
+  max-height: 340px;
+  overflow-y: auto; overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
 .pf-weight-input:focus { outline: 2px solid var(--blue-mid); border-color: transparent; }
 .pf-invest-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; color: var(--text); }
 .pf-invest-row label { font-weight: 700; }
@@ -1100,7 +1125,11 @@ table.vbct-tbl td.c { text-align: center; }
       </div>
       <div class="vbct-subtitle">自訂權重組合 VBCT／VCCT／UND 多檔標的，本金（淨值）與配息分開計算　｜　點基金名稱可開啟富邦官網頁面</div>
     </div>
-    <button class="vbct-btn" onclick="loadFundUniverse(true)"><svg class="i" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> 重新載入基金清單</button>
+    <a class="vbct-btn" href="/top10" target="_blank" style="text-decoration:none">
+    <svg class="i" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+    排行榜 TOP 10
+  </a>
+  <button class="vbct-btn" onclick="loadFundUniverse(true)"><svg class="i" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg> 重新載入基金清單</button>
   </div>
 </header>
 <div class="vbct-main">
@@ -1117,7 +1146,7 @@ table.vbct-tbl td.c { text-align: center; }
       </select>
     </div>
     <div class="pf-results-note" id="pf-results-note"></div>
-    <div class="vbct-table-scroll">
+    <div class="pf-search-scroll">
       <table class="vbct-tbl">
         <thead>
           <tr>
@@ -1719,7 +1748,7 @@ function rrCls(rr) {
 }
 function rrBadge(rr) {
   if (!rr) return '<span class="freq-none">－</span>';
-  return '<b class="' + rrCls(rr) + '">' + eh(rr) + '</b>';
+  return '<span class="' + rrCls(rr) + '">' + eh(rr) + '</span>';
 }
 // ─────────────────────────────────────────────────────────
 // localStorage 快取（基金清單，每日台灣中午 12 點更新）
@@ -1879,7 +1908,7 @@ function addFundToPortfolio(key) {
   if (_portfolio.some(function(p) { return p.key === key; })) return;
   var f = (window._fundUniverse || []).find(function(x) { return x.key === key; });
   if (!f) return;
-  _portfolio.push({ key: f.key, source: f.source, v40: f.v40, v41: f.v41, name: f.name, code: f.code, cur: f.cur, nav: f.nav, freq: f.freq, weight: 0 });
+  _portfolio.push({ key: f.key, source: f.source, v40: f.v40, v41: f.v41, name: f.name, code: f.code, cur: f.cur, nav: f.nav, freq: f.freq, rr: f.rr || '', weight: 0 });
   if (!_weightsDirty) equalizeWeights(); else renderPortfolioList();
   renderSearchResults();
 }
@@ -1888,6 +1917,13 @@ function removeFundFromPortfolio(key) {
   if (!_weightsDirty) equalizeWeights(); else renderPortfolioList();
   renderSearchResults();
   if (!_portfolio.length) hidePfAnalysis();
+}
+function stepWeight(key, delta) {
+  var p = _portfolio.find(function(x) { return x.key === key; });
+  if (!p) return;
+  p.weight = Math.max(0, Math.min(100, +((p.weight || 0) + delta).toFixed(2)));
+  _weightsDirty = true;
+  renderPortfolioList();
 }
 function updateWeight(key, val) {
   var n = parseFloat(val);
@@ -1922,10 +1958,15 @@ function renderPortfolioList() {
     wrap.innerHTML = _portfolio.map(function(p) {
       return '<div class="pf-fund-row">'
         + '<div class="pf-fund-row-main">'
-        + '<div class="pf-fund-row-name"><span class="src-badge src-' + p.source + '">' + p.source + '</span>' + eh(p.name) + ' ' + freqBadge(p.freq) + '</div>'
+        + '<div class="pf-fund-row-name"><span class="src-badge src-' + p.source + '">' + p.source + '</span>' + eh(p.name) + ' ' + freqBadge(p.freq) + (p.rr ? ' <span class="' + rrCls(p.rr) + '">' + eh(p.rr) + '</span>' : '') + '</div>'
         + '<div class="pf-fund-row-meta">' + eh(p.code) + ' ／ ' + eh(p.cur) + '</div>'
         + '</div>'
-        + '<div class="pf-weight-wrap"><input type="number" class="pf-weight-input" min="0" max="100" step="5" value="' + p.weight + '" oninput="updateWeight(\'' + ea(p.key) + '\', this.value)">%</div>'
+        + '<div class="pf-weight-wrap">'
+        + '<button class="pf-step-btn" onclick="stepWeight(\'' + ea(p.key) + '\',-5)" title="-5%">−</button>'
+        + '<input type="number" class="pf-weight-input" min="0" max="100" step="5" value="' + p.weight + '" oninput="updateWeight(\'' + ea(p.key) + '\', this.value)">'
+        + '<span style="font-size:13px;color:var(--muted)">%</span>'
+        + '<button class="pf-step-btn" onclick="stepWeight(\'' + ea(p.key) + '\',5)" title="+5%">+</button>'
+        + '</div>'
         + '<button class="pf-remove-btn" onclick="removeFundFromPortfolio(\'' + ea(p.key) + '\')">移除</button>'
         + '</div>';
     }).join('');
@@ -2346,7 +2387,7 @@ function renderPfInvestRows(rows) {
     + '<td class="r"><b>' + sumLastMonthDivAmt.toFixed(2) + ' 萬元</b></td>'
     + '</tr>';
   return '<div class="bt-section-title">' + ICON.list + ' 各基金投入金額試算明細（依目前權重分配上方投入金額）</div>'
-    + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr><th>基金</th><th class="r">權重</th><th class="r">分配投入金額</th><th class="r">買入時淨值（原幣）</th><th class="r">期末淨值（原幣）</th><th class="r">期間報酬（淨值）</th><th class="r">期末市值</th><th class="r">期間總領金額</th><th class="r">最新月領金額</th></tr></thead><tbody>' + trs + totalRow + '</tbody></table></div>'
+    + '<div class="pf-search-scroll"><table class="vbct-tbl"><thead><tr><th>基金</th><th class="r">權重</th><th class="r">分配投入金額</th><th class="r">買入時淨值（原幣）</th><th class="r">期末淨值（原幣）</th><th class="r">期間報酬（淨值）</th><th class="r">期末市值</th><th class="r">期間總領金額</th><th class="r">最新月領金額</th></tr></thead><tbody>' + trs + totalRow + '</tbody></table></div>'
     + '<div class="pf-breakdown-note">' + ICON.warnSm + ' 「買入時淨值」「期末淨值」為各基金原始幣別之淨值數字，僅供對照走勢，非新台幣金額；其餘金額欄位依上方投入金額按目前權重分配後，以各基金自身原幣淨值漲跌幅與配息率換算，配息未再投資。「期間總領金額」與上方期間分頁同步；「最新月領金額」採各基金資料中最新一個有配息紀錄之月份，各基金月份可能不同，不受期間分頁篩選。<b>換算匯率：1</b>（外幣原幣金額直接視為等額新台幣金額，未實際換算匯率，與實際入帳金額可能有落差，請審酌參考）。表格最後一列「組合加總」為各基金金額欄位加總；期間報酬則為加總後期末市值與加總投入金額之比較。</div>';
 }
 // ─────────────────────────────────────────────────────────
@@ -2459,7 +2500,7 @@ function pfRenderTodayDiv() {
     + '</tr>';
 
   el.innerHTML = '<div class="bt-section-title">' + ICON.coin + ' 今日進場預估月配息（淨值日期：' + lastNavDate + '）</div>'
-    + '<div class="vbct-table-scroll"><table class="vbct-tbl"><thead><tr>'
+    + '<div class="pf-search-scroll"><table class="vbct-tbl"><thead><tr>'
     + '<th>基金</th><th class="r">權重</th><th class="r">淨值（' + lastNavDate + '）</th>'
     + '<th class="r">最新月配息／單位</th><th class="r">預估月配息率</th>'
     + incomeHeader
