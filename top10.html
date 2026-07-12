@@ -157,7 +157,7 @@
     gap: 12px;
   }
   @media (min-width: 560px) { .card-grid { grid-template-columns: 1fr 1fr; } }
-  @media (min-width: 960px) { .card-grid { display: none; } }
+  @media (min-width: 768px) { .card-grid { display: none; } }
 
   /* ─────────────────── Fund Card ─────────────────── */
   .fund-card {
@@ -321,10 +321,10 @@
     border: 1px solid var(--border);
     display: none;
   }
-  @media (min-width: 960px) { .table-wrap { display: block; } }
+  @media (min-width: 768px) { .table-wrap { display: block; } }
   table { width: 100%; border-collapse: collapse; }
-  thead { position: sticky; top: calc(var(--header-h) + var(--tab-h)); z-index: 10; }
   thead th {
+    position: sticky; top: calc(var(--header-h) + var(--tab-h)); z-index: 10;
     background: var(--surface2); color: var(--text-dim);
     font-size: 11px; font-weight: 600;
     text-transform: uppercase; letter-spacing: 0.6px;
@@ -352,6 +352,7 @@
   .name-cell { max-width: 260px; min-width: 160px; }
   .fund-name-td { font-weight: 600; font-size: 13.5px; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.4; }
   .fund-code-td { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .fundname-warning { font-size: 11px; color: var(--text-muted); font-weight: 400; display: block; }
   .rate-cell-inner { display: flex; flex-direction: column; align-items: flex-end; gap: 5px; }
   .rate-mini-bar { width: 72px; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
   .rate-mini-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent) 0%, #60a5fa 100%); border-radius: 2px; }
@@ -489,6 +490,7 @@
           <div class="section-title">RR3 三年總報酬 TOP 10</div>
           <div class="section-sub">僅限風險等級 RR3 · 三年累積報酬率排名</div>
         </div>
+      v>
       </div>
       <div class="card-grid" id="cards-rr3"></div>
       <div class="table-wrap">
@@ -541,6 +543,7 @@ function switchTab(tab) {
 }
 
 /* ── Helpers ── */
+function strip(s) { return s ? String(s).replace(/<[^>]*>/g, '') : ''; }
 function esc(s) {
   if (!s) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -601,7 +604,7 @@ function renderRateCards(data) {
       '<div class="card-top">' + rankBadgeCard(f.rank) +
         '<div class="card-badges">' + rrBadge(f.rr) + curBadge(f.cur) + '</div>' +
       '</div>' +
-      '<div class="card-name">' + esc(f.name) + '</div>' +
+      '<div class="card-name">' + f.name + '</div>' +
       '<div class="card-code">' + esc(f.code) + '</div>' +
       '<div class="card-divider"></div>' +
       '<div class="card-primary-label">年化配息率</div>' +
@@ -625,7 +628,7 @@ function renderRetCards(data) {
       '<div class="card-top">' + rankBadgeCard(f.rank) +
         '<div class="card-badges">' + rrBadge(f.rr) + freqBadge(f.freq) + curBadge(f.cur) + '</div>' +
       '</div>' +
-      '<div class="card-name">' + esc(f.name) + '</div>' +
+      '<div class="card-name">' + f.name + '</div>' +
       '<div class="card-code">' + esc(f.code) + '</div>' +
       '<div class="card-divider"></div>' +
       '<div class="card-primary-label">三年累積報酬</div>' +
@@ -646,7 +649,7 @@ function renderRateTable(data) {
     var barW = maxRate > 0 ? Math.round((f.rate || 0) / maxRate * 100) : 0;
     return '<tr data-rank="' + f.rank + '">' +
       '<td>' + rankBadgeTbl(f.rank) + '</td>' +
-      '<td class="name-cell"><div class="fund-name-td" title="' + esc(f.name) + '">' + esc(f.name) + '</div><div class="fund-code-td">' + esc(f.code) + '</div></td>' +
+      '<td class="name-cell"><div class="fund-name-td" title="' + esc(strip(f.name)) + '">' + f.name + '</div><div class="fund-code-td">' + esc(f.code) + '</div></td>' +
       '<td>' + esc(f.cur || '—') + '</td>' +
       '<td>' + rrBadge(f.rr) + '</td>' +
       '<td class="r"><div class="rate-cell-inner"><span class="v-hi">' + (f.rate != null ? f.rate.toFixed(2) + '%' : '—') + '</span><div class="rate-mini-bar"><div class="rate-mini-bar-fill" style="width:' + barW + '%"></div></div></div></td>' +
@@ -661,7 +664,7 @@ function renderRetTable(data) {
   return data.map(function(f) {
     return '<tr data-rank="' + f.rank + '">' +
       '<td>' + rankBadgeTbl(f.rank) + '</td>' +
-      '<td class="name-cell"><div class="fund-name-td" title="' + esc(f.name) + '">' + esc(f.name) + '</div><div class="fund-code-td">' + esc(f.code) + '</div></td>' +
+      '<td class="name-cell"><div class="fund-name-td" title="' + esc(strip(f.name)) + '">' + f.name + '</div><div class="fund-code-td">' + esc(f.code) + '</div></td>' +
       '<td>' + esc(f.cur || '—') + '</td>' +
       '<td>' + rrBadge(f.rr) + '</td>' +
       '<td>' + (freqBadge(f.freq) || '<span class="v-dim">—</span>') + '</td>' +
