@@ -1129,6 +1129,58 @@ table.vbct-tbl td.c { text-align: center; }
 /* ── 年化配息率呈現 ── */
 .pf-rate { color: #b45309; font-weight: 800; font-size: 13px; }
 .pf-rate-loading { font-size: 11px; color: var(--muted); }
+/* ── 快速篩選器 ── */
+.pf-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-end;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: #f7fafd;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+}
+.pf-filter-item { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.pf-filter-item label {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+}
+.pf-filter-item select {
+  padding: 6px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 12.5px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+  min-height: 34px;
+  cursor: pointer;
+}
+.pf-filter-item select:focus { outline: 2px solid var(--blue-mid); border-color: transparent; }
+.pf-filter-reset {
+  padding: 6px 14px;
+  min-height: 34px;
+  background: #e2e8f0;
+  color: #475569;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.pf-filter-reset:hover { background: #cbd5e1; }
+@media (max-width: 599px) {
+  .pf-filters { gap: 8px; padding: 10px; }
+  .pf-filter-item { flex: 1 1 calc(50% - 4px); }
+  .pf-filter-item select { width: 100%; min-height: 40px; }
+  .pf-filter-reset { flex: 1 1 100%; min-height: 40px; }
+}
 .src-badge { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap; }
 .src-VBCT { background: var(--blue); }
 .src-VCCT { background: #c2410c; }
@@ -1301,6 +1353,64 @@ table.vbct-tbl td.c { text-align: center; }
     <div class="pf-search-row">
       <input id="pf-search-q" type="text" placeholder="輸入基金名稱或代碼搜尋..." oninput="pfSearchDebounced()" autocomplete="off">
     </div>
+    <div class="pf-filters" id="pf-filters">
+      <div class="pf-filter-item">
+        <label for="pf-f-rate">年化配息率 ≥</label>
+        <select id="pf-f-rate" onchange="pfApplyFilters()">
+          <option value="">不限</option>
+          <option value="3">3%</option>
+          <option value="5">5%</option>
+          <option value="6">6%</option>
+          <option value="8">8%</option>
+          <option value="10">10%</option>
+        </select>
+      </div>
+      <div class="pf-filter-item">
+        <label for="pf-f-ret1y">一年報酬 ≥</label>
+        <select id="pf-f-ret1y" onchange="pfApplyFilters()">
+          <option value="">不限</option>
+          <option value="0">0%（不虧）</option>
+          <option value="5">5%</option>
+          <option value="10">10%</option>
+          <option value="20">20%</option>
+        </select>
+      </div>
+      <div class="pf-filter-item">
+        <label for="pf-f-ret3y">三年報酬 ≥</label>
+        <select id="pf-f-ret3y" onchange="pfApplyFilters()">
+          <option value="">不限</option>
+          <option value="0">0%（不虧）</option>
+          <option value="20">20%</option>
+          <option value="50">50%</option>
+        </select>
+      </div>
+      <div class="pf-filter-item">
+        <label for="pf-f-rr">風險上限</label>
+        <select id="pf-f-rr" onchange="pfApplyFilters()">
+          <option value="">不限</option>
+          <option value="RR2">RR2 以下</option>
+          <option value="RR3">RR3 以下</option>
+          <option value="RR4">RR4 以下</option>
+        </select>
+      </div>
+      <div class="pf-filter-item">
+        <label for="pf-f-cur">幣別</label>
+        <select id="pf-f-cur" onchange="pfApplyFilters()">
+          <option value="">不限</option>
+          <option value="台幣">台幣</option>
+          <option value="美元">美元</option>
+        </select>
+      </div>
+      <div class="pf-filter-item">
+        <label for="pf-f-freq">配息頻率</label>
+        <select id="pf-f-freq" onchange="pfApplyFilters()">
+          <option value="">不限</option>
+          <option value="月配">月配</option>
+          <option value="季配">季配</option>
+        </select>
+      </div>
+      <button class="pf-filter-reset" onclick="pfResetFilters()">清除條件</button>
+    </div>
     <div class="pf-results-note" id="pf-results-note"></div>
     <div class="pf-results-note" id="pf-rate-status"></div>
     <div class="pf-search-scroll">
@@ -1315,10 +1425,13 @@ table.vbct-tbl td.c { text-align: center; }
             <th onclick="pfSortBy(5)" class="c">風險<span class="th-sub">RR1～RR5</span></th>
             <th onclick="pfSortBy(6)" class="r">當日淨值</th>
             <th onclick="pfSortBy(7)" class="r">年化配息率<span class="th-sub">近6月均×12÷淨值</span></th>
+            <th onclick="pfSortBy(8)" class="r">六個月<span class="th-sub">含息報酬(%)</span></th>
+            <th onclick="pfSortBy(9)" class="r">一年<span class="th-sub">含息報酬(%)</span></th>
+            <th onclick="pfSortBy(10)" class="r">三年<span class="th-sub">含息報酬(%)</span></th>
             <th class="c">操作</th>
           </tr>
         </thead>
-        <tbody id="pf-results-tbody"><tr><td colspan="9" class="pf-empty">載入中...</td></tr></tbody>
+        <tbody id="pf-results-tbody"><tr><td colspan="12" class="pf-empty">載入中...</td></tr></tbody>
       </table>
     </div>
   </div>
@@ -1432,22 +1545,49 @@ function normalizeDivMonth(dateStr) {
   return m[1] + '/' + m[2];
 }
 // 解析一般基金配息 HTML
+// ─────────────────────────────────────────────────────────
+// 配息表解析
+// 原本以 DOMParser 解析整頁 HTML，單檔約需 150ms，數百檔連續解析會
+// 長時間佔住主執行緒（實測每批阻塞約 900ms，頁面等同凍結）。
+// 改為 regex 逐列抽取，只取需要的儲存格，成本降低一到兩個數量級。
+// ─────────────────────────────────────────────────────────
+var _HTML_ENTITIES = {
+  '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>',
+  '&quot;': '"', '&#39;': "'", '&apos;': "'"
+};
+function decodeEntities(s) {
+  return s.replace(/&(?:nbsp|amp|lt|gt|quot|apos|#39);/g, function(m) {
+    return _HTML_ENTITIES[m] || m;
+  }).replace(/&#(\d+);/g, function(_, d) {
+    return String.fromCharCode(parseInt(d, 10));
+  });
+}
+function stripCell(s) {
+  // 先移除 script/style 內容，再去標籤，最後解碼實體並正規化空白
+  return decodeEntities(
+    s.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
+     .replace(/<[^>]*>/g, '')
+  ).replace(/\s+/g, ' ').trim();
+}
+var _TR_RE = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+var _TD_RE = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
 function parseDivHtml(html, isIShares) {
-  var doc = new DOMParser().parseFromString(html, 'text/html');
   var result = [];
-  doc.querySelectorAll('table tr').forEach(function(row) {
-    var cells = row.querySelectorAll('td');
+  var rowM;
+  _TR_RE.lastIndex = 0;
+  while ((rowM = _TR_RE.exec(html)) !== null) {
+    var cells = [], cellM;
+    _TD_RE.lastIndex = 0;
+    while ((cellM = _TD_RE.exec(rowM[1])) !== null) cells.push(stripCell(cellM[1]));
     if (cells.length >= 5) {
-      var st = cells[3].textContent.trim();
-      var am = parseFloat(cells[4].textContent.trim());
-      var exDate = cells[0].textContent.trim();
-      var dt = cells[1].textContent.trim();
+      var st = cells[3];
+      var am = parseFloat(cells[4]);
       if ((st === '配息' || st === '撥回') && !isNaN(am) && am > 0) {
-        var useDate = isIShares ? normalizeDivMonth(exDate) : dt.substring(0, 7);
+        var useDate = isIShares ? normalizeDivMonth(cells[0]) : cells[1].substring(0, 7);
         result.push({ date: useDate, amount: am });
       }
     }
-  });
+  }
   return result;
 }
 // 解析 ETF 配息 JSON（V41=C）
@@ -1941,6 +2081,11 @@ function rateCell(rate) {
   if (rate === null || rate === undefined || !isFinite(rate)) return '<span class="freq-none">—</span>';
   return '<b class="pf-rate">' + rate.toFixed(2) + '%</b>';
 }
+// 含息報酬率呈現：正藍負紅，與工具其餘部分一致
+function retCell(v) {
+  if (v === null || v === undefined || !isFinite(v)) return '<span class="freq-none">—</span>';
+  return '<b class="' + (v < 0 ? 'ret-neg' : 'ret-pos') + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + '</b>';
+}
 // ─────────────────────────────────────────────────────────
 // localStorage 快取（基金清單，每日台灣中午 12 點更新）
 // ─────────────────────────────────────────────────────────
@@ -1970,11 +2115,28 @@ function saveFundCache(list) {
 // 基金清單抓取（同時支援 VBCT／VCCT／UND 三種商品代碼）
 // ─────────────────────────────────────────────────────────
 async function fetchFundList(product) {
-  var text = await fetchBig5('/w/custom/djjson/SearchProductJSON.djjson?m=0&P=' + product + '&Change=1');
-  var funds = JSON.parse(text).ResultSet.Result || [];
+  // 一般版取基本資料，績效版（M=1）取累積報酬率。兩支都是整批 JSON，
+  // 各險種只需一次請求，不需逐檔抓取。
+  // 績效版欄位：V11=三個月, V12=六個月, V13=一年, V15=三年（無二年）
+  var pair = await Promise.all([
+    fetchBig5('/w/custom/djjson/SearchProductJSON.djjson?m=0&P=' + product + '&Change=1'),
+    fetchBig5('/w/custom/djjson/SearchProductJSON.djjson?P1=fubonlif&P2=False&P3=False&P4=0&P5=0&M=1&P=' + product + '&CHANGE=1')
+      .catch(function() { return null; })
+  ]);
+  var funds = JSON.parse(pair[0]).ResultSet.Result || [];
+  var retMap = {};
+  if (pair[1]) {
+    try {
+      (JSON.parse(pair[1]).ResultSet.Result || []).forEach(function(r) {
+        function pv(v) { var n = parseFloat(v); return isNaN(n) ? null : n; }
+        retMap[r.V40] = { m6: pv(r.V12), y1: pv(r.V13), y3: pv(r.V15) };
+      });
+    } catch(e) { /* 報酬率解析失敗不中斷主流程 */ }
+  }
   return funds
     .filter(function(f) { return !isDiscretionary(f); }) // 排除 D 型全權委託（不支援逐日淨值）
     .map(function(f) {
+      var rr = retMap[f.V40] || {};
       return {
         key: product + '-' + f.V40,
         source: product,
@@ -1987,29 +2149,48 @@ async function fetchFundList(product) {
         freq: f.V42 || '無',
         rr: f.V28 || '',
         nav: parseFloat(f.V18) || 0,
+        ret6m: rr.m6 == null ? null : rr.m6,
+        ret1y: rr.y1 == null ? null : rr.y1,
+        ret3y: rr.y3 == null ? null : rr.y3,
         url: getFundUrl(f)
       };
     });
 }
 // ─────────────────────────────────────────────────────────
-// 年化配息率背景補齊：僅針對月配基金逐批抓取配息紀錄，
-// 算出年化配息率後併回 _fundUniverse 並更新快取。
-// 採背景進行，不阻擋使用者搜尋與加入組合。
+// 年化配息率：按需計算（每檔需向來源抓一次配息頁，實測約 560ms／檔，
+// 網路為絕對瓶頸）。因此只計算「目前畫面上看得到」的標的；使用者要依
+// 配息率排序全表時才補齊其餘標的。每批完成即寫入快取，中途離開頁面
+// 不會丟失已算好的進度。
 // ─────────────────────────────────────────────────────────
-var _pfRateLoading = false;
-async function enrichAnnualRates() {
-  if (_pfRateLoading) return;
-  var universe = window._fundUniverse || [];
-  var targets = universe.filter(function(f) {
-    return f.freq === '月配' && f.nav > 0 && f.rate === undefined;
-  });
-  var noteEl = $('pf-rate-status');
-  var RATE_NOTE = '年化配息率＝近 6 個月月配平均 × 12 ÷ 當日淨值（僅月配標的）';
-  if (!targets.length) { if (noteEl) noteEl.textContent = RATE_NOTE; return; }
-  _pfRateLoading = true;
-  var BS = 6, done = 0;
-  for (var i = 0; i < targets.length; i += BS) {
-    var batch = targets.slice(i, i + BS);
+var RATE_NOTE = '年化配息率＝近 6 個月月配平均 × 12 ÷ 當日淨值（僅月配標的）';
+var _rateQueue = [];
+var _rateRunning = false;
+function needsRate(f) {
+  return f.freq === '月配' && f.nav > 0 && f.rate === undefined && !f._q;
+}
+// 將指定標的排入計算佇列（重複排入無效果）
+function queueRates(list) {
+  var added = 0;
+  list.forEach(function(f) { if (needsRate(f)) { f._q = true; _rateQueue.push(f); added++; } });
+  if (added) runRateQueue();
+  return added;
+}
+// 依配息率排序時需要完整資料，補齊全表
+function ensureAllRates() { return queueRates(window._fundUniverse || []); }
+function updateRateNote() {
+  var el = $('pf-rate-status');
+  if (!el) return;
+  if (_rateQueue.length) {
+    el.innerHTML = ICON.loader + ' 年化配息率計算中…尚餘 ' + _rateQueue.length + ' 檔';
+  } else {
+    el.textContent = RATE_NOTE;
+  }
+}
+async function runRateQueue() {
+  if (_rateRunning) return;
+  _rateRunning = true;
+  while (_rateQueue.length) {
+    var batch = _rateQueue.splice(0, 6);
     await Promise.all(batch.map(async function(f) {
       try {
         var divs = await fetchDividendHistory({ v40: f.v40, v41: f.v41, name: f.name });
@@ -2018,18 +2199,13 @@ async function enrichAnnualRates() {
         f.rate = (rate !== null && isFinite(rate)) ? rate : null;
       } catch(e) { f.rate = null; }
     }));
-    done += batch.length;
-    if (noteEl) noteEl.textContent = '年化配息率計算中… ' + Math.min(done, targets.length) + ' / ' + targets.length;
-    // 每 4 批更新一次畫面，降低重繪成本
-    if ((i / BS) % 4 === 0) renderSearchResults();
-    await new Promise(function(r) { setTimeout(r, 180); });
+    saveFundCache(window._fundUniverse || []); // 逐批落地，避免中途離開白做工
+    updateRateNote();
+    renderSearchResults();
+    await new Promise(function(r) { setTimeout(r, 120); });
   }
-  // 非月配或抓取失敗者標記為 null，避免重整後重複嘗試
-  universe.forEach(function(f) { if (f.rate === undefined) f.rate = null; });
-  saveFundCache(universe);
-  _pfRateLoading = false;
-  if (noteEl) noteEl.textContent = RATE_NOTE;
-  renderSearchResults();
+  _rateRunning = false;
+  updateRateNote();
 }
 async function loadFundUniverse(force) {
   var statusEl = $('pf-search-status');
@@ -2037,11 +2213,13 @@ async function loadFundUniverse(force) {
   if (!force) {
     var cached = loadFundCache();
     if (cached && cached.list && cached.list.length) {
+      // 清除排隊註記：上次可能在計算途中離開，這些標的需要重新排入
+      cached.list.forEach(function(f) { delete f._q; });
       window._fundUniverse = cached.list;
       pfUpdateTabCounts();
       renderSearchResults();
       if (statusEl) statusEl.innerHTML = ICON.zap + ' 已載入快取：VBCT + VCCT + UND 共 ' + cached.list.length + ' 筆標的';
-      enrichAnnualRates();
+      updateRateNote();
       return;
     }
   }
@@ -2053,7 +2231,7 @@ async function loadFundUniverse(force) {
     pfUpdateTabCounts();
     renderSearchResults();
     if (statusEl) statusEl.innerHTML = ICON.zap + ' VBCT ' + lists[0].length + ' 筆／VCCT ' + lists[1].length + ' 筆／UND ' + lists[2].length + ' 筆，共 ' + combined.length + ' 筆標的';
-    enrichAnnualRates();
+    updateRateNote();
   } catch(e) {
     if (statusEl) statusEl.innerHTML = ICON.error + ' 載入基金清單失敗：' + eh(e.message) + '<br><small style="color:#b91c1c">請確認網路連線後按「重新載入清單」再試一次。</small>';
   }
@@ -2085,13 +2263,45 @@ function pfUpdateTabCounts() {
     if (el) el.textContent = universe.filter(function(f) { return f.source === s; }).length || '—';
   });
 }
+// ── 快速篩選器 ──────────────────────────────────────────
+var RR_ORDER = { RR1: 1, RR2: 2, RR3: 3, RR4: 4, RR5: 5 };
+var PF_FILTER_IDS = ['pf-f-rate', 'pf-f-ret1y', 'pf-f-ret3y', 'pf-f-rr', 'pf-f-cur', 'pf-f-freq'];
+function pfGetFilters() {
+  function v(id) { var el = $(id); return el ? el.value : ''; }
+  return {
+    rate: parseFloat(v('pf-f-rate')),
+    ret1y: parseFloat(v('pf-f-ret1y')),
+    ret3y: parseFloat(v('pf-f-ret3y')),
+    rr: v('pf-f-rr'), cur: v('pf-f-cur'), freq: v('pf-f-freq')
+  };
+}
+function pfPassFilters(f, ft) {
+  if (isFinite(ft.rate)  && !(typeof f.rate  === 'number' && f.rate  >= ft.rate))  return false;
+  if (isFinite(ft.ret1y) && !(typeof f.ret1y === 'number' && f.ret1y >= ft.ret1y)) return false;
+  if (isFinite(ft.ret3y) && !(typeof f.ret3y === 'number' && f.ret3y >= ft.ret3y)) return false;
+  if (ft.rr  && !(RR_ORDER[f.rr] && RR_ORDER[f.rr] <= RR_ORDER[ft.rr])) return false;
+  if (ft.cur && f.cur !== ft.cur) return false;
+  if (ft.freq && f.freq !== ft.freq) return false;
+  return true;
+}
+function pfApplyFilters() {
+  // 以配息率設門檻時，需要全表都算過才能正確篩選
+  if (isFinite(parseFloat(($('pf-f-rate') || {}).value))) ensureAllRates();
+  renderSearchResults();
+}
+function pfResetFilters() {
+  PF_FILTER_IDS.forEach(function(id) { var el = $(id); if (el) el.value = ''; });
+  renderSearchResults();
+}
 function renderSearchResults() {
   var universe = window._fundUniverse || [];
   var q = (($('pf-search-q') || {}).value || '').trim().toLowerCase();
   var src = _pfSrc;
+  var ft = pfGetFilters();
   var filtered = universe.filter(function(f) {
     return (!src || f.source === src)
-      && (!q || f.name.toLowerCase().includes(q) || f.code.toLowerCase().includes(q));
+      && (!q || f.name.toLowerCase().includes(q) || f.code.toLowerCase().includes(q))
+      && pfPassFilters(f, ft);
   });
   var total = filtered.length;
   if (_pfSortCol >= 0) {
@@ -2100,6 +2310,8 @@ function renderSearchResults() {
     filtered = filtered.slice().sort(function(a, b) { return a.name.localeCompare(b.name, 'zh-TW'); });
   }
   filtered = filtered.slice(0, 60);
+  // 只為畫面上看得到的標的排入配息率計算，避免一次打 291 次請求
+  queueRates(filtered);
   var inPortfolio = {};
   _portfolio.forEach(function(p) { inPortfolio[p.key] = true; });
   var rowsHtml = filtered.map(function(f) {
@@ -2118,6 +2330,9 @@ function renderSearchResults() {
       + '<td data-label="年化配息率" class="r">' + (f.freq !== '月配' ? '<span class="freq-none">—</span>'
           : f.rate === undefined ? '<span class="pf-rate-loading">計算中…</span>'
           : rateCell(f.rate)) + '</td>'
+      + '<td data-label="六個月報酬" class="r">' + retCell(f.ret6m) + '</td>'
+      + '<td data-label="一年報酬" class="r">' + retCell(f.ret1y) + '</td>'
+      + '<td data-label="三年報酬" class="r">' + retCell(f.ret3y) + '</td>'
       + '<td data-label="操作" class="c">' + (added
           ? '<span style="color:#16a34a;font-size:11.5px;font-weight:700">已加入</span>'
           : '<button class="pf-add-btn" onclick="addFundToPortfolio(\'' + ea(f.key) + '\')">' + ICON.zap + ' 加入</button>')
@@ -2130,7 +2345,7 @@ function renderSearchResults() {
   // 保留捲動位置，避免背景補齊配息率時畫面跳動
   var scrollBox = document.querySelector('.pf-search-scroll');
   var keepTop = scrollBox ? scrollBox.scrollTop : 0;
-  if (tbody) tbody.innerHTML = rowsHtml || '<tr><td colspan="9" class="pf-empty">查無符合條件的基金</td></tr>';
+  if (tbody) tbody.innerHTML = rowsHtml || '<tr><td colspan="12" class="pf-empty">查無符合條件的基金</td></tr>';
   if (scrollBox) scrollBox.scrollTop = keepTop;
   // 標記排序中欄位之箭頭樣式（限搜尋結果表格）
   var headRow = tbody && tbody.parentElement && tbody.parentElement.querySelector('thead tr');
@@ -2145,12 +2360,12 @@ function renderSearchResults() {
 // 搜尋結果表格排序（點欄位標題排序，0~6；7=操作欄不支援排序）
 // ─────────────────────────────────────────────────────────
 var _pfSortCol = -1, _pfSortDir = 1;
-var PF_SORT_FIELDS = ['name', 'source', 'code', 'cur', 'freq', 'rr', 'nav', 'rate'];
+var PF_SORT_FIELDS = ['name', 'source', 'code', 'cur', 'freq', 'rr', 'nav', 'rate', 'ret6m', 'ret1y', 'ret3y'];
 function pfSortComparator(a, b) {
   var field = PF_SORT_FIELDS[_pfSortCol];
   var av = a[field], bv = b[field];
-  // 年化配息率：未計算或無配息之標的一律排在後面
-  if (field === 'rate') {
+  // 數值欄位：無資料一律排在後面，避免空值佔據排序前段
+  if (field === 'rate' || field === 'ret6m' || field === 'ret1y' || field === 'ret3y') {
     var an = (typeof av === 'number' && isFinite(av)) ? av : null;
     var bn = (typeof bv === 'number' && isFinite(bv)) ? bv : null;
     if (an === null && bn === null) return 0;
@@ -2167,6 +2382,8 @@ function pfSortComparator(a, b) {
 function pfSortBy(col) {
   _pfSortDir = (_pfSortCol === col) ? -_pfSortDir : 1;
   _pfSortCol = col;
+  // 依配息率排序需要全表資料才有意義，此時才補齊其餘標的
+  if (col === 7) ensureAllRates();
   renderSearchResults();
 }
 // ─────────────────────────────────────────────────────────
