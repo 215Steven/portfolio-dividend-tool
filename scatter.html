@@ -1,0 +1,778 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>配息─報酬散佈圖 | VBCT／VCCT／UND（非官方）</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --navy: #1a3a5c; --blue: #2657a0; --blue-mid: #3b82c4; --blue-pale: #e8f0fe;
+  --bg: #eef2f8; --surface: #ffffff; --border: #d8e4f0; --border-soft: #e8f0fa;
+  --text: #1a2535; --muted: #637080;
+  --shadow: 0 1px 6px rgba(26,58,92,0.08), 0 4px 20px rgba(26,58,92,0.06);
+  --shadow-sm: 0 1px 4px rgba(26,58,92,0.07);
+  --vbct: #2657a0; --vcct: #c2410c; --und: #15803d;
+  --radius: 10px;
+}
+body {
+  font-family: '微軟正黑體','Microsoft JhengHei','PingFang TC','Noto Sans TC',Arial,sans-serif;
+  background: var(--bg); color: var(--text); font-size: 14px; line-height: 1.5;
+  min-height: 100dvh;
+}
+.i { width: 14px; height: 14px; display: inline-block; vertical-align: -2px; flex-shrink: 0;
+     fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.i-sm { width: 11px; height: 11px; vertical-align: -1px; }
+.i-lg { width: 17px; height: 17px; vertical-align: -3px; }
+@keyframes i-spin { to { transform: rotate(360deg); } }
+.i-spin { animation: i-spin 0.9s linear infinite; }
+/* ── Header ── */
+.hd {
+  background: linear-gradient(135deg, #0f2744 0%, var(--navy) 40%, var(--blue) 75%, #2e6ec5 100%);
+  color: #fff; padding-top: env(safe-area-inset-top, 0px);
+  position: sticky; top: 0; z-index: 200;
+  box-shadow: 0 2px 12px rgba(10,30,60,0.36), 0 1px 0 rgba(255,255,255,0.07) inset;
+}
+.hd-in { max-width: 1500px; margin: 0 auto; display: flex; align-items: center; gap: 16px;
+         flex-wrap: wrap; padding: 14px 20px 12px; }
+.hd-block { flex: 1; min-width: 0; }
+.hd-title { font-size: 18px; font-weight: 900; letter-spacing: 0.2px; display: flex; align-items: center; gap: 8px; }
+.hd-badge { font-size: 9.5px; font-weight: 700; letter-spacing: 1.2px; color: rgba(255,255,255,0.55);
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.18);
+            padding: 2px 7px; border-radius: 4px; text-transform: uppercase; vertical-align: middle; }
+.hd-sub { font-size: 11px; opacity: 0.65; margin-top: 3px; }
+.hd-btn {
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.28);
+  color: rgba(255,255,255,0.92); padding: 7px 16px; border-radius: 7px; cursor: pointer;
+  font-size: 12px; font-family: inherit; font-weight: 700; text-decoration: none;
+  transition: background 0.15s; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+  min-height: 38px;
+}
+.hd-btn:hover { background: rgba(255,255,255,0.22); }
+/* ── Main ── */
+.main { max-width: 1500px; margin: 0 auto; padding: 16px 16px calc(50px + env(safe-area-inset-bottom, 0px)); }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+        box-shadow: var(--shadow-sm); padding: 16px 18px; margin-bottom: 14px; }
+/* ── 控制列 ── */
+.ctrls { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: flex-end; }
+.ctrl { display: flex; flex-direction: column; gap: 4px; }
+.ctrl label { font-size: 10px; font-weight: 700; color: var(--muted); letter-spacing: 0.4px;
+              text-transform: uppercase; white-space: nowrap; }
+.ctrl select {
+  padding: 7px 10px; border: 1px solid var(--border); border-radius: 7px; font-size: 13px;
+  font-family: inherit; background: var(--surface); color: var(--text); min-height: 36px; cursor: pointer;
+}
+.ctrl select:focus { outline: 2px solid var(--blue-mid); border-color: transparent; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: #f1f5f9; }
+.seg button {
+  appearance: none; border: none; background: transparent; font-family: inherit; font-size: 12.5px;
+  font-weight: 700; padding: 0 14px; min-height: 36px; cursor: pointer; color: var(--muted);
+  border-right: 1px solid var(--border); transition: background 0.15s, color 0.15s;
+}
+.seg button:last-child { border-right: none; }
+.seg button:hover { background: #e6edf5; color: var(--text); }
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--acc, var(--blue));
+                                   box-shadow: inset 0 -2px 0 0 var(--acc, var(--blue)); }
+.seg button[data-v="VBCT"] { --acc: var(--vbct); }
+.seg button[data-v="VCCT"] { --acc: var(--vcct); }
+.seg button[data-v="UND"]  { --acc: var(--und); }
+/* ── 進度 ── */
+.prog { margin-top: 12px; font-size: 11.5px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.prog-track { flex: 1 1 180px; height: 5px; background: #e5eaf2; border-radius: 3px; overflow: hidden; min-width: 120px; }
+.prog-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #4fc3f7, var(--navy));
+            border-radius: 3px; transition: width 0.35s ease; }
+.prog-btn {
+  padding: 5px 12px; min-height: 32px; background: var(--blue-pale); color: var(--blue);
+  border: 1px solid #c3d8f5; border-radius: 6px; font-size: 11.5px; font-weight: 700;
+  font-family: inherit; cursor: pointer;
+}
+.prog-btn:hover { background: #d7e6fc; }
+.prog-btn:disabled { opacity: 0.5; cursor: default; }
+/* ── 圖表 ── */
+.chart-wrap { position: relative; }
+svg.chart { width: 100%; height: auto; display: block; touch-action: pan-y; }
+.grid-line { stroke: #e8eef6; stroke-width: 1; }
+.med-line { stroke: #94a3b8; stroke-width: 1; stroke-dasharray: 4 4; }
+.axis-txt { font-size: 10.5px; fill: var(--muted); }
+.axis-lbl { font-size: 11.5px; fill: var(--navy); font-weight: 700; }
+.quad-lbl { font-size: 10.5px; font-weight: 700; opacity: 0.5; }
+.dot { cursor: pointer; transition: r 0.12s, fill-opacity 0.12s; }
+.dot:hover { fill-opacity: 1 !important; }
+.dot.dim { fill-opacity: 0.1 !important; }
+/* ── Tooltip ── */
+.tip {
+  position: absolute; pointer-events: none; z-index: 50; background: rgba(15,32,56,0.96); color: #fff;
+  border-radius: 8px; padding: 9px 12px; font-size: 12px; line-height: 1.55; max-width: 280px;
+  box-shadow: 0 6px 24px rgba(10,30,60,0.35); opacity: 0; transition: opacity 0.12s;
+}
+.tip.on { opacity: 1; }
+.tip-name { font-weight: 700; margin-bottom: 4px; font-size: 12.5px; }
+.tip-row { display: flex; justify-content: space-between; gap: 14px; }
+.tip-k { color: rgba(255,255,255,0.6); }
+.tip-v { font-weight: 700; font-variant-numeric: tabular-nums; }
+.tip-hint { margin-top: 5px; font-size: 10px; color: rgba(255,255,255,0.45); }
+/* ── 圖例 / 統計 ── */
+.legend { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; margin-top: 12px;
+          padding-top: 12px; border-top: 1px solid var(--border-soft); font-size: 11.5px; color: var(--muted); }
+.lg-item { display: inline-flex; align-items: center; gap: 6px; }
+.lg-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+.lg-sz { display: inline-flex; align-items: center; gap: 4px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+.stat { background: var(--surface); border: 1px solid var(--border); border-top: 3px solid var(--blue);
+        border-radius: var(--radius); padding: 12px 14px 10px; box-shadow: var(--shadow-sm); }
+.stat-num { font-size: 21px; font-weight: 900; color: var(--navy); line-height: 1.1; letter-spacing: -0.4px;
+            font-variant-numeric: tabular-nums; }
+.stat-lbl { font-size: 10px; color: var(--muted); margin-top: 4px; text-transform: uppercase;
+            letter-spacing: 0.5px; font-weight: 600; }
+/* ── 榜單 ── */
+.picks-head { font-size: 13px; font-weight: 800; color: var(--navy); display: flex; align-items: center;
+              gap: 7px; margin-bottom: 4px; }
+.picks-sub { font-size: 11.5px; color: var(--muted); margin-bottom: 12px; }
+table.tbl { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+table.tbl thead tr { background: linear-gradient(to right, #152d4a, #1d3f65); color: #fff; }
+table.tbl th { padding: 9px 9px; text-align: left; font-size: 10.5px; font-weight: 700;
+               letter-spacing: 0.4px; white-space: nowrap; }
+table.tbl th.r { text-align: right; }
+table.tbl td { padding: 7px 9px; border-bottom: 1px solid #eef2f8; vertical-align: middle; }
+table.tbl td.r { text-align: right; font-variant-numeric: tabular-nums; }
+table.tbl tbody tr:nth-child(even) td { background: #fafcff; }
+table.tbl tbody tr:hover td { background: #eef5ff; }
+.src-badge { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 10.5px;
+             font-weight: 700; color: #fff; white-space: nowrap; }
+.src-VBCT { background: var(--vbct); } .src-VCCT { background: var(--vcct); } .src-UND { background: var(--und); }
+.fund-link { color: var(--navy); text-decoration: none; border-bottom: 1px dotted rgba(26,58,92,0.45); }
+.fund-link:hover { color: var(--blue-mid); }
+.rate-v { color: #b45309; font-weight: 800; }
+.pos { color: #1d4ed8; font-weight: 700; } .neg { color: #dc2626; font-weight: 700; }
+.rr { display: inline-block; padding: 1px 6px; border-radius: 20px; font-size: 10.5px; font-weight: 700; }
+.rr-1{background:#05966912;color:#059669;border:1px solid #059669;} .rr-2{background:#16a34a12;color:#16a34a;border:1px solid #16a34a;}
+.rr-3{background:#2563eb12;color:#2563eb;border:1px solid #2563eb;} .rr-4{background:#d9770612;color:#d97706;border:1px solid #d97706;}
+.rr-5{background:#dc262612;color:#dc2626;border:1px solid #dc2626;}
+/* ── Notices ── */
+.notices { margin-top: 14px; background: #fffdf5; border: 1px solid #fde68a; border-left: 4px solid #f59e0b;
+           border-radius: 0 var(--radius) var(--radius) 0; padding: 14px 18px 16px; font-size: 12px;
+           color: #6b4209; line-height: 1.75; }
+.notices-title { font-size: 10.5px; font-weight: 800; color: #92400e; text-transform: uppercase;
+                 letter-spacing: 0.8px; margin-bottom: 6px; display: flex; align-items: center; gap: 6px; }
+.notices ol { margin: 8px 0 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 7px; }
+.notices li { display: flex; gap: 8px; font-size: 11.5px; line-height: 1.65; }
+.note-num { flex-shrink: 0; font-weight: 800; color: #92400e; font-size: 10.5px; background: #fef3c7;
+            border-radius: 3px; padding: 1px 5px; height: fit-content; margin-top: 1px; }
+.ftr { margin-top: 16px; padding: 14px 0 6px; border-top: 1px solid var(--border); display: flex;
+       justify-content: space-between; flex-wrap: wrap; gap: 6px; font-size: 11px; color: #8fa0b4; }
+/* ── RWD ── */
+@media (max-width: 900px) { .stats { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 599px) {
+  .main { padding: 10px 10px calc(50px + env(safe-area-inset-bottom, 0px)); }
+  .hd-in { padding: 8px 12px 7px; }
+  .hd-title { font-size: 14px; gap: 6px; } .hd-sub { display: none; }
+  .card { padding: 12px; }
+  .ctrls { gap: 8px 10px; }
+  .ctrl { flex: 1 1 calc(50% - 5px); }
+  .ctrl select { width: 100%; min-height: 40px; font-size: 16px; }
+  .seg { width: 100%; } .seg button { flex: 1; min-height: 40px; padding: 0 6px; }
+  .stat-num { font-size: 17px; }
+  table.tbl { font-size: 11px; }
+  table.tbl th, table.tbl td { padding: 6px 5px; }
+  .tbl-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+}
+</style>
+</head>
+<body>
+<header class="hd">
+  <div class="hd-in">
+    <div class="hd-block">
+      <div class="hd-title">
+        <svg class="i i-lg" viewBox="0 0 24 24"><circle cx="6" cy="17" r="2.4"/><circle cx="12" cy="9" r="2.4"/><circle cx="18" cy="13" r="2.4"/><path d="M3 21h18"/></svg>
+        配息─報酬散佈圖
+        <span class="hd-badge">非官方</span>
+      </div>
+      <div class="hd-sub">橫軸年化配息率、縱軸含息報酬率　｜　一眼看出「高配息但賠淨值」的標的　｜　點圓點可開啟富邦官網頁面</div>
+    </div>
+    <a class="hd-btn" href="./index.html">
+      <svg class="i" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+      回組合分析工具
+    </a>
+  </div>
+</header>
+
+<div class="main">
+  <!-- 統計 -->
+  <div class="stats">
+    <div class="stat"><div class="stat-num" id="s-plot">—</div><div class="stat-lbl">圖上標的數</div></div>
+    <div class="stat"><div class="stat-num" id="s-rate">—</div><div class="stat-lbl">配息率中位數</div></div>
+    <div class="stat"><div class="stat-num" id="s-ret">—</div><div class="stat-lbl">報酬率中位數</div></div>
+    <div class="stat"><div class="stat-num" id="s-trap">—</div><div class="stat-lbl">高配息卻負報酬</div></div>
+  </div>
+
+  <!-- 控制 -->
+  <div class="card">
+    <div class="ctrls">
+      <div class="ctrl">
+        <label>險種</label>
+        <div class="seg" id="seg-src" role="group" aria-label="險種">
+          <button data-v="" aria-pressed="true" onclick="setSrc('')">全部</button>
+          <button data-v="VBCT" aria-pressed="false" onclick="setSrc('VBCT')">VBCT</button>
+          <button data-v="VCCT" aria-pressed="false" onclick="setSrc('VCCT')">VCCT</button>
+          <button data-v="UND" aria-pressed="false" onclick="setSrc('UND')">UND</button>
+        </div>
+      </div>
+      <div class="ctrl">
+        <label for="c-ret">縱軸（含息報酬）</label>
+        <select id="c-ret" onchange="redraw()">
+          <option value="ret1y" selected>一年</option>
+          <option value="ret6m">六個月</option>
+          <option value="ret3y">三年</option>
+        </select>
+      </div>
+      <div class="ctrl">
+        <label for="c-rr">風險上限</label>
+        <select id="c-rr" onchange="redraw()">
+          <option value="">不限</option>
+          <option value="RR2">RR2 以下</option>
+          <option value="RR3">RR3 以下</option>
+          <option value="RR4">RR4 以下</option>
+        </select>
+      </div>
+      <div class="ctrl">
+        <label for="c-cur">幣別</label>
+        <select id="c-cur" onchange="redraw()">
+          <option value="">不限</option>
+          <option value="台幣">台幣</option>
+          <option value="美元">美元</option>
+        </select>
+      </div>
+      <div class="ctrl">
+        <label for="c-color">圓點顏色</label>
+        <select id="c-color" onchange="redraw()">
+          <option value="src" selected>依險種</option>
+          <option value="rr">依風險等級</option>
+        </select>
+      </div>
+    </div>
+    <div class="prog">
+      <span id="prog-txt">初始化中…</span>
+      <span class="prog-track"><span class="prog-bar" id="prog-bar"></span></span>
+      <button class="prog-btn" id="prog-btn" onclick="loadAllRates()">補齊全部配息率</button>
+    </div>
+  </div>
+
+  <!-- 圖表 -->
+  <div class="card chart-wrap">
+    <svg class="chart" id="chart" viewBox="0 0 1000 620" preserveAspectRatio="xMidYMid meet"
+         role="img" aria-label="配息率與報酬率散佈圖"></svg>
+    <div class="tip" id="tip"></div>
+    <div class="legend" id="legend"></div>
+  </div>
+
+  <!-- 榜單 -->
+  <div class="card">
+    <div class="picks-head">
+      <svg class="i" viewBox="0 0 24 24"><polygon points="12 2 15.1 8.6 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.6 12 2"/></svg>
+      右上象限：配息與報酬都在中位數以上
+    </div>
+    <div class="picks-sub" id="picks-sub">兩項都優於中位數的標的，通常是比較均衡的選擇。依配息率高到低排序，最多顯示 12 檔。</div>
+    <div class="tbl-scroll">
+      <table class="tbl">
+        <thead><tr>
+          <th>基金名稱</th><th>來源</th><th>幣別</th><th class="c">風險</th>
+          <th class="r">年化配息率</th><th class="r" id="th-ret">一年報酬</th><th class="r">淨值</th>
+        </tr></thead>
+        <tbody id="picks-body"><tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px">載入中…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- 說明 -->
+  <div class="notices">
+    <div class="notices-title">
+      <svg class="i i-sm" viewBox="0 0 24 24"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      免責聲明
+    </div>
+    <div><strong>配息率僅供參考，過去績效不代表未來，配息來源可能為本金。</strong>本頁為非官方工具，與富邦人壽無任何關聯，請以各基金公司官方公告為準。</div>
+    <ol>
+      <li><span class="note-num">註1</span><span>橫軸「年化配息率」＝近 6 個月月配平均 × 12 ÷ 當日淨值，僅月配標的有此數值，因此圖上只呈現月配標的。此算法與 VBCT／VCCT／UND 單一標的分析工具一致。</span></li>
+      <li><span class="note-num">註2</span><span>縱軸「含息報酬率」取自富邦投資型保險專區之累積報酬率，為原幣別報酬且已考慮配息情況，非本頁自行計算。二年報酬因該資料來源未提供，故不列入選項。</span></li>
+      <li><span class="note-num">註3</span><span>虛線為目前圖上標的之<b>中位數</b>，會隨篩選條件即時變動，僅用於相對比較，不代表任何投資建議。右下象限（高配息、負報酬）意味著配息可能來自本金侵蝕，請特別留意。</span></li>
+      <li><span class="note-num">註4</span><span>圓點大小代表淨值高低，僅為視覺輔助。配息率需逐檔向資料來源抓取，首次載入僅計算部分標的，可按「補齊全部配息率」載入其餘標的（約需 1 分鐘）。已算過的結果會與組合分析工具共用快取。</span></li>
+    </ol>
+  </div>
+
+  <div class="ftr">
+    <span>本工具為非官方工具，與富邦人壽保險股份有限公司無任何關聯</span>
+    <span>資料來源：invest.fubonlife.com.tw</span>
+  </div>
+</div>
+<script>
+const PROXY_BASE = '/api/proxy';
+const FUBON_BASE = 'https://invest.fubonlife.com.tw';
+var FUND_CACHE_KEY = 'portfolio-fundlist-v4';
+var _HTML_ENTITIES = {
+  '&nbsp;': ' ', '&amp;': '&', '&lt;': '<', '&gt;': '>',
+  '&quot;': '"', '&#39;': "'", '&apos;': "'"
+};
+var _TR_RE = /<tr[^>]*>([\s\S]*?)<\/tr>/gi;
+var _TD_RE = /<t[dh][^>]*>([\s\S]*?)<\/t[dh]>/gi;
+async function fetchBig5(path) {
+  const proxyUrl = PROXY_BASE + '?url=' + encodeURIComponent(path);
+  const r = await fetch(proxyUrl);
+  if (!r.ok) throw new Error('Proxy 回傳 ' + r.status + ' (' + path.split('?')[0] + ')');
+  const buf = await r.arrayBuffer();
+  return new TextDecoder('big5').decode(buf);
+}
+function isDiscretionary(f) { return f.V41 === 'D' || (f.V5 && f.V5.includes('全權委託')); }
+function getFundUrl(f) {
+  if (f.V41 === 'B') return FUBON_BASE + '/w/wb/wb01.djhtm?a=' + f.V40;
+  if (f.V41 === 'A') return FUBON_BASE + '/w/wr/wr01.djhtm?a=' + f.V40;
+  if (f.V41 === 'C') return FUBON_BASE + '/ETFWeb/HTML/ET050000.DJHTM#ETFID=' + f.V40;
+  return null;
+}
+function isISharesName(name) { return name && name.toLowerCase().includes('ishares'); }
+function isFubonETF(f)       { return f.V41 === 'C'; }
+function normalizeDivMonth(dateStr) {
+  var m = dateStr.match(/(\d{4})\/(\d{2})\/(\d{2})/);
+  if (!m) return dateStr.substring(0, 7);
+  var yr = parseInt(m[1]), mo = parseInt(m[2]), day = parseInt(m[3]);
+  if (mo === 12 && day >= 16) return (yr + 1) + '/01';
+  return m[1] + '/' + m[2];
+}
+function parseDivHtml(html, isIShares) {
+  var result = [];
+  var rowM;
+  _TR_RE.lastIndex = 0;
+  while ((rowM = _TR_RE.exec(html)) !== null) {
+    var cells = [], cellM;
+    _TD_RE.lastIndex = 0;
+    while ((cellM = _TD_RE.exec(rowM[1])) !== null) cells.push(stripCell(cellM[1]));
+    if (cells.length >= 5) {
+      var st = cells[3];
+      var am = parseFloat(cells[4]);
+      if ((st === '配息' || st === '撥回') && !isNaN(am) && am > 0) {
+        var useDate = isIShares ? normalizeDivMonth(cells[0]) : cells[1].substring(0, 7);
+        result.push({ date: useDate, amount: am });
+      }
+    }
+  }
+  return result;
+}
+function parseEtfDivJson(jsonText, isIShares) {
+  try {
+    var data = JSON.parse(jsonText);
+    var rows = data.ResultSet.Result || [];
+    return rows.reduce(function(acc, r) {
+      var am = parseFloat(r.V4);
+      var dateStr = r.V1 || '';
+      if (!isNaN(am) && am > 0 && dateStr) {
+        var useDate = isIShares ? normalizeDivMonth(dateStr) : dateStr.substring(0, 7);
+        acc.push({ date: useDate, amount: am });
+      }
+      return acc;
+    }, []);
+  } catch(e) { return []; }
+}
+async function fetchDividendHistory(r) {
+  if (!r.v40 || !r.v41) return [];
+  var isISh = isISharesName(r.name);
+  try {
+    if (r.v41 === 'C') {
+      var jtext = await fetchBig5('/ETFData/djjson/et050000json.djjson?a=' + r.v40);
+      return parseEtfDivJson(jtext, isISh);
+    } else if (r.v41 === 'B') {
+      return parseDivHtml(await fetchBig5('/w/wb/wb05.djhtm?a=' + r.v40), isISh);
+    } else if (r.v41 === 'A') {
+      return parseDivHtml(await fetchBig5('/w/wr/wr10.djhtm?a=' + r.v40), isISh);
+    }
+  } catch (e) { /* 配息資料抓取失敗，不中斷回測流程，僅略過還原 */ }
+  return [];
+}
+function get6MonthDivs(divs, isETF) {
+  if (!divs || divs.length === 0) return [];
+  if (isETF) return divs.slice(0, 6);
+  var seen = {}, r = [];
+  for (var i = 0; i < divs.length; i++) {
+    var key = divs[i].date.substring(0, 7);
+    if (!seen[key]) { seen[key] = true; r.push(divs[i]); }
+    if (r.length >= 6) break;
+  }
+  return r;
+}
+function calcRate(nav, r6) {
+  if (!r6 || r6.length === 0 || !(nav > 0)) return null;
+  var avg = r6.reduce(function(s, d) { return s + d.amount; }, 0) / r6.length;
+  return avg * 12 / nav * 100;
+}
+function decodeEntities(s) {
+  return s.replace(/&(?:nbsp|amp|lt|gt|quot|apos|#39);/g, function(m) {
+    return _HTML_ENTITIES[m] || m;
+  }).replace(/&#(\d+);/g, function(_, d) {
+    return String.fromCharCode(parseInt(d, 10));
+  });
+}
+function stripCell(s) {
+  // 先移除 script/style 內容，再去標籤，最後解碼實體並正規化空白
+  return decodeEntities(
+    s.replace(/<(script|style)[^>]*>[\s\S]*?<\/\1>/gi, '')
+     .replace(/<[^>]*>/g, '')
+  ).replace(/\s+/g, ' ').trim();
+}
+function loadFundCache() {
+  try {
+    var raw = localStorage.getItem(FUND_CACHE_KEY);
+    if (!raw) return null;
+    var obj = JSON.parse(raw);
+    if (!obj || !obj.expiry || Date.now() > obj.expiry) return null;
+    return obj;
+  } catch(e) { return null; }
+}
+function saveFundCache(list) {
+  try {
+    localStorage.setItem(FUND_CACHE_KEY, JSON.stringify({ list: list, expiry: nextNoonTW() }));
+  } catch(e) { /* 容量不足時靜默失敗 */ }
+}
+function nextNoonTW() {
+  var now = new Date();
+  var candidate = new Date(now);
+  candidate.setUTCHours(4, 0, 0, 0);
+  if (candidate <= now) candidate.setUTCDate(candidate.getUTCDate() + 1);
+  return candidate.getTime();
+}
+
+// ═══════════════════════════════════════════════════════════
+//  配息─報酬散佈圖
+//  與組合分析工具共用 localStorage 快取（同一 key），因此在主工具
+//  已算過的年化配息率，開啟本頁時可直接沿用，不必重抓。
+// ═══════════════════════════════════════════════════════════
+function $(id) { return document.getElementById(id); }
+function eh(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function(c) {
+  return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]; }); }
+
+var SRC_COLOR = { VBCT: '#2657a0', VCCT: '#c2410c', UND: '#15803d' };
+var RR_COLOR  = { RR1:'#059669', RR2:'#16a34a', RR3:'#2563eb', RR4:'#d97706', RR5:'#dc2626' };
+var RR_ORDER  = { RR1:1, RR2:2, RR3:3, RR4:4, RR5:5 };
+var RET_LABEL = { ret6m: '六個月', ret1y: '一年', ret3y: '三年' };
+
+var _all = [];        // 全部標的
+var _src = '';        // 目前險種篩選
+var _plotted = [];    // 目前畫在圖上的點
+var _queue = [], _running = false, _queueTotal = 0;
+
+// ── 基金清單（含報酬率）──────────────────────────────────
+async function fetchList(product) {
+  var pair = await Promise.all([
+    fetchBig5('/w/custom/djjson/SearchProductJSON.djjson?m=0&P=' + product + '&Change=1'),
+    fetchBig5('/w/custom/djjson/SearchProductJSON.djjson?P1=fubonlif&P2=False&P3=False&P4=0&P5=0&M=1&P=' + product + '&CHANGE=1')
+      .catch(function() { return null; })
+  ]);
+  var funds = JSON.parse(pair[0]).ResultSet.Result || [];
+  var retMap = {};
+  if (pair[1]) {
+    try {
+      (JSON.parse(pair[1]).ResultSet.Result || []).forEach(function(r) {
+        function pv(v) { var n = parseFloat(v); return isNaN(n) ? null : n; }
+        retMap[r.V40] = { m6: pv(r.V12), y1: pv(r.V13), y3: pv(r.V15) };
+      });
+    } catch(e) {}
+  }
+  return funds.filter(function(f) { return !isDiscretionary(f); }).map(function(f) {
+    var rr = retMap[f.V40] || {};
+    return {
+      key: product + '-' + f.V40, source: product,
+      v40: f.V40 || '', v41: f.V41 || '',
+      name: (f.V3 || '').replace(/<[^>]+>/g, '').trim(),
+      code: f.V47 || '', cur: f.V26 || '',
+      type: (f.V5 || '').replace(/<[^>]+>/g, '').trim(),
+      freq: f.V42 || '無', rr: f.V28 || '', nav: parseFloat(f.V18) || 0,
+      ret6m: rr.m6 == null ? null : rr.m6,
+      ret1y: rr.y1 == null ? null : rr.y1,
+      ret3y: rr.y3 == null ? null : rr.y3,
+      url: getFundUrl(f)
+    };
+  });
+}
+
+async function boot() {
+  var cached = loadFundCache();
+  if (cached && cached.list && cached.list.length) {
+    cached.list.forEach(function(f) { delete f._q; });
+    _all = cached.list;
+    setProg('已沿用組合分析工具的快取：共 ' + _all.length + ' 檔');
+  } else {
+    setProg('載入基金清單中…');
+    try {
+      var ls = await Promise.all([fetchList('VBCT'), fetchList('VCCT'), fetchList('UND')]);
+      _all = ls[0].concat(ls[1]).concat(ls[2]);
+      saveFundCache(_all);
+    } catch(e) {
+      setProg('載入失敗：' + e.message);
+      return;
+    }
+  }
+  redraw();
+  // 先補齊「目前畫得出來的候選」以外的一小批，讓圖不會太空
+  var seed = _all.filter(needsRate).slice(0, 60);
+  if (seed.length) queueRates(seed);
+  else updateProg();
+}
+
+// ── 配息率抓取佇列 ────────────────────────────────────────
+function needsRate(f) { return f.freq === '月配' && f.nav > 0 && f.rate === undefined && !f._q; }
+function queueRates(list) {
+  var n = 0;
+  list.forEach(function(f) { if (needsRate(f)) { f._q = true; _queue.push(f); n++; } });
+  if (n) { _queueTotal += n; runQueue(); }
+  return n;
+}
+function loadAllRates() {
+  var n = queueRates(_all);
+  if (!n) setProg('全部月配標的都已計算完成');
+  $('prog-btn').disabled = true;
+}
+async function runQueue() {
+  if (_running) return;
+  _running = true;
+  while (_queue.length) {
+    var batch = _queue.splice(0, 6);
+    await Promise.all(batch.map(async function(f) {
+      try {
+        var divs = await fetchDividendHistory({ v40: f.v40, v41: f.v41, name: f.name });
+        var r6 = get6MonthDivs(divs, f.v41 === 'C');
+        var rate = calcRate(f.nav, r6);
+        f.rate = (rate !== null && isFinite(rate)) ? rate : null;
+      } catch(e) { f.rate = null; }
+    }));
+    saveFundCache(_all);          // 逐批落地，中途離開不會白做工
+    updateProg();
+    redraw();
+    await new Promise(function(r) { setTimeout(r, 120); });
+  }
+  _running = false;
+  _queueTotal = 0;
+  updateProg();
+}
+function setProg(msg) { $('prog-txt').textContent = msg; }
+function updateProg() {
+  var monthly = _all.filter(function(f) { return f.freq === '月配'; }).length;
+  var done = _all.filter(function(f) { return typeof f.rate === 'number'; }).length;
+  var pending = _all.filter(function(f) { return f.freq === '月配' && f.rate === undefined; }).length;
+  $('prog-bar').style.width = monthly ? Math.round(done / monthly * 100) + '%' : '0%';
+  if (_queue.length) setProg('計算配息率中…尚餘 ' + _queue.length + ' 檔');
+  else if (pending) setProg('已算 ' + done + ' / ' + monthly + ' 檔月配標的，其餘尚未計算');
+  else setProg('全部 ' + monthly + ' 檔月配標的皆已計算完成');
+  $('prog-btn').disabled = _queue.length > 0 || pending === 0;
+}
+
+// ── 篩選 ──────────────────────────────────────────────────
+function setSrc(v) {
+  _src = v;
+  Array.prototype.forEach.call(document.querySelectorAll('#seg-src button'), function(b) {
+    b.setAttribute('aria-pressed', b.getAttribute('data-v') === v ? 'true' : 'false');
+  });
+  redraw();
+}
+function currentSet() {
+  var retKey = $('c-ret').value, rrCap = $('c-rr').value, cur = $('c-cur').value;
+  return _all.filter(function(f) {
+    if (_src && f.source !== _src) return false;
+    if (cur && f.cur !== cur) return false;
+    if (rrCap && !(RR_ORDER[f.rr] && RR_ORDER[f.rr] <= RR_ORDER[rrCap])) return false;
+    return typeof f.rate === 'number' && isFinite(f.rate)
+        && typeof f[retKey] === 'number' && isFinite(f[retKey]);
+  });
+}
+function median(arr) {
+  if (!arr.length) return 0;
+  var s = arr.slice().sort(function(a, b) { return a - b; });
+  var m = Math.floor(s.length / 2);
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+function niceBounds(vals, pad) {
+  var lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+  if (lo === hi) { lo -= 1; hi += 1; }
+  var span = hi - lo;
+  return { lo: lo - span * pad, hi: hi + span * pad };
+}
+
+// ── 繪圖 ──────────────────────────────────────────────────
+var W = 1000, H = 620, M = { t: 26, r: 22, b: 54, l: 62 };
+function redraw() {
+  var retKey = $('c-ret').value;
+  var colorBy = $('c-color').value;
+  var pts = currentSet();
+  _plotted = pts;
+  $('th-ret').textContent = RET_LABEL[retKey] + '報酬';
+
+  var svg = $('chart');
+  if (!pts.length) {
+    svg.innerHTML = '<text x="' + (W/2) + '" y="' + (H/2) + '" text-anchor="middle" class="axis-txt">'
+      + '尚無足夠資料，請稍候或按「補齊全部配息率」</text>';
+    $('s-plot').textContent = '0';
+    $('s-rate').textContent = $('s-ret').textContent = $('s-trap').textContent = '—';
+    $('picks-body').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px">尚無資料</td></tr>';
+    renderLegend(colorBy);
+    return;
+  }
+
+  var xs = pts.map(function(p) { return p.rate; });
+  var ys = pts.map(function(p) { return p[retKey]; });
+  var xb = niceBounds(xs, 0.08), yb = niceBounds(ys, 0.08);
+  var mx = median(xs), my = median(ys);
+  var navs = pts.map(function(p) { return p.nav; });
+  var navLo = Math.min.apply(null, navs), navHi = Math.max.apply(null, navs);
+
+  function X(v) { return M.l + (v - xb.lo) / (xb.hi - xb.lo) * (W - M.l - M.r); }
+  function Y(v) { return H - M.b - (v - yb.lo) / (yb.hi - yb.lo) * (H - M.t - M.b); }
+  function R(nav) {
+    if (navHi === navLo) return 5;
+    return 3.6 + Math.sqrt((nav - navLo) / (navHi - navLo)) * 6.4;
+  }
+
+  var g = [];
+  // 象限底色：右下（高配息、負報酬）標紅提醒
+  g.push('<rect x="' + X(mx) + '" y="' + Y(my) + '" width="' + (W - M.r - X(mx)) + '" height="' + (H - M.b - Y(my)) + '" fill="#dc2626" opacity="0.045"/>');
+  g.push('<rect x="' + X(mx) + '" y="' + M.t + '" width="' + (W - M.r - X(mx)) + '" height="' + (Y(my) - M.t) + '" fill="#16a34a" opacity="0.05"/>');
+
+  // 格線 + 刻度
+  var xt = ticks(xb.lo, xb.hi, 6), yt = ticks(yb.lo, yb.hi, 6);
+  xt.forEach(function(v) {
+    g.push('<line class="grid-line" x1="' + X(v) + '" y1="' + M.t + '" x2="' + X(v) + '" y2="' + (H - M.b) + '"/>');
+    g.push('<text class="axis-txt" x="' + X(v) + '" y="' + (H - M.b + 17) + '" text-anchor="middle">' + v.toFixed(1) + '%</text>');
+  });
+  yt.forEach(function(v) {
+    g.push('<line class="grid-line" x1="' + M.l + '" y1="' + Y(v) + '" x2="' + (W - M.r) + '" y2="' + Y(v) + '"/>');
+    g.push('<text class="axis-txt" x="' + (M.l - 9) + '" y="' + (Y(v) + 3.5) + '" text-anchor="end">' + v.toFixed(0) + '%</text>');
+  });
+  // 零報酬基準線
+  if (yb.lo < 0 && yb.hi > 0) {
+    g.push('<line x1="' + M.l + '" y1="' + Y(0) + '" x2="' + (W - M.r) + '" y2="' + Y(0) + '" stroke="#94a3b8" stroke-width="1.5"/>');
+    g.push('<text class="axis-txt" x="' + (W - M.r - 4) + '" y="' + (Y(0) - 5) + '" text-anchor="end" style="font-weight:700">報酬 0%</text>');
+  }
+  // 中位數虛線
+  g.push('<line class="med-line" x1="' + X(mx) + '" y1="' + M.t + '" x2="' + X(mx) + '" y2="' + (H - M.b) + '"/>');
+  g.push('<line class="med-line" x1="' + M.l + '" y1="' + Y(my) + '" x2="' + (W - M.r) + '" y2="' + Y(my) + '"/>');
+
+  // 象限標籤
+  g.push('<text class="quad-lbl" x="' + (W - M.r - 8) + '" y="' + (M.t + 15) + '" text-anchor="end" fill="#16a34a">高配息 · 高報酬</text>');
+  g.push('<text class="quad-lbl" x="' + (W - M.r - 8) + '" y="' + (H - M.b - 8) + '" text-anchor="end" fill="#dc2626">高配息 · 低報酬（留意本金侵蝕）</text>');
+  g.push('<text class="quad-lbl" x="' + (M.l + 8) + '" y="' + (M.t + 15) + '" fill="#64748b">低配息 · 高報酬</text>');
+
+  // 軸標題
+  g.push('<text class="axis-lbl" x="' + (M.l + (W - M.l - M.r) / 2) + '" y="' + (H - 12) + '" text-anchor="middle">年化配息率（近6月均 × 12 ÷ 淨值）</text>');
+  g.push('<text class="axis-lbl" transform="translate(16,' + (M.t + (H - M.t - M.b) / 2) + ') rotate(-90)" text-anchor="middle">' + RET_LABEL[retKey] + '含息報酬率</text>');
+
+  // 圓點：大的先畫，小的後畫避免完全遮蔽
+  pts.slice().sort(function(a, b) { return R(b.nav) - R(a.nav); }).forEach(function(p, i) {
+    var c = colorBy === 'rr' ? (RR_COLOR[p.rr] || '#94a3b8') : (SRC_COLOR[p.source] || '#94a3b8');
+    var idx = _plotted.indexOf(p);
+    g.push('<circle class="dot" cx="' + X(p.rate).toFixed(1) + '" cy="' + Y(p[retKey]).toFixed(1) + '" r="' + R(p.nav).toFixed(1)
+      + '" fill="' + c + '" fill-opacity="0.62" stroke="#fff" stroke-width="1.1"'
+      + ' data-i="' + idx + '" tabindex="0" role="button" aria-label="' + eh(p.name) + '"/>');
+  });
+
+  svg.innerHTML = g.join('');
+  bindDots(retKey);
+  renderLegend(colorBy);
+
+  // 統計
+  var trap = pts.filter(function(p) { return p.rate >= mx && p[retKey] < 0; }).length;
+  $('s-plot').textContent = pts.length;
+  $('s-rate').textContent = mx.toFixed(2) + '%';
+  $('s-ret').textContent  = my.toFixed(1) + '%';
+  $('s-trap').textContent = trap;
+
+  renderPicks(pts, mx, my, retKey);
+}
+
+function ticks(lo, hi, n) {
+  var span = hi - lo, raw = span / n;
+  var mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  var step = [1, 2, 2.5, 5, 10].reduce(function(best, m) {
+    return Math.abs(m * mag - raw) < Math.abs(best * mag - raw) ? m : best; }, 1) * mag;
+  var out = [], v = Math.ceil(lo / step) * step;
+  while (v <= hi && out.length < 20) { out.push(v); v += step; }
+  return out;
+}
+
+function renderLegend(colorBy) {
+  var items = [];
+  if (colorBy === 'rr') {
+    ['RR1','RR2','RR3','RR4','RR5'].forEach(function(k) {
+      items.push('<span class="lg-item"><span class="lg-dot" style="background:' + RR_COLOR[k] + '"></span>' + k + '</span>');
+    });
+  } else {
+    ['VBCT','VCCT','UND'].forEach(function(k) {
+      items.push('<span class="lg-item"><span class="lg-dot" style="background:' + SRC_COLOR[k] + '"></span>' + k + '</span>');
+    });
+  }
+  items.push('<span class="lg-sz"><svg width="30" height="14" viewBox="0 0 30 14">'
+    + '<circle cx="5" cy="7" r="3" fill="#94a3b8"/><circle cx="16" cy="7" r="5" fill="#94a3b8"/><circle cx="26" cy="7" r="3" fill="none"/></svg>圓點大小＝淨值高低</span>');
+  items.push('<span class="lg-item"><span style="width:14px;border-top:1px dashed #94a3b8;display:inline-block"></span>中位數</span>');
+  $('legend').innerHTML = items.join('');
+}
+
+// ── Tooltip ───────────────────────────────────────────────
+function bindDots(retKey) {
+  var tip = $('tip'), svg = $('chart'), wrap = svg.parentElement;
+  Array.prototype.forEach.call(svg.querySelectorAll('.dot'), function(el) {
+    function show(ev) {
+      var p = _plotted[+el.getAttribute('data-i')];
+      if (!p) return;
+      tip.innerHTML = '<div class="tip-name">' + eh(p.name) + '</div>'
+        + '<div class="tip-row"><span class="tip-k">年化配息率</span><span class="tip-v">' + p.rate.toFixed(2) + '%</span></div>'
+        + '<div class="tip-row"><span class="tip-k">' + RET_LABEL[retKey] + '報酬</span><span class="tip-v">' + (p[retKey] > 0 ? '+' : '') + p[retKey].toFixed(2) + '%</span></div>'
+        + '<div class="tip-row"><span class="tip-k">淨值 / 幣別</span><span class="tip-v">' + p.nav.toFixed(4) + ' ' + eh(p.cur) + '</span></div>'
+        + '<div class="tip-row"><span class="tip-k">來源 / 風險</span><span class="tip-v">' + p.source + ' · ' + (p.rr || '—') + '</span></div>'
+        + (p.url ? '<div class="tip-hint">點擊開啟官網頁面</div>' : '');
+      tip.classList.add('on');
+      var wr = wrap.getBoundingClientRect();
+      var br = el.getBoundingClientRect();
+      var x = br.left - wr.left + br.width / 2, y = br.top - wr.top;
+      tip.style.left = Math.max(6, Math.min(x - tip.offsetWidth / 2, wr.width - tip.offsetWidth - 6)) + 'px';
+      tip.style.top = Math.max(6, y - tip.offsetHeight - 10) + 'px';
+      el.setAttribute('r', (parseFloat(el.getAttribute('r')) + 2).toFixed(1));
+      el.dataset.grew = '1';
+    }
+    function hide() {
+      tip.classList.remove('on');
+      if (el.dataset.grew) { el.setAttribute('r', (parseFloat(el.getAttribute('r')) - 2).toFixed(1)); delete el.dataset.grew; }
+    }
+    el.addEventListener('mouseenter', show);
+    el.addEventListener('mouseleave', hide);
+    el.addEventListener('focus', show);
+    el.addEventListener('blur', hide);
+    el.addEventListener('click', function() {
+      var p = _plotted[+el.getAttribute('data-i')];
+      if (p && p.url) window.open(p.url, '_blank', 'noopener');
+    });
+  });
+}
+
+// ── 右上象限榜單 ──────────────────────────────────────────
+function renderPicks(pts, mx, my, retKey) {
+  var win = pts.filter(function(p) { return p.rate >= mx && p[retKey] >= my; })
+               .sort(function(a, b) { return b.rate - a.rate; }).slice(0, 12);
+  $('picks-sub').textContent = '配息率 ≥ ' + mx.toFixed(2) + '%　且　' + RET_LABEL[retKey]
+    + '報酬 ≥ ' + my.toFixed(1) + '%（皆為目前篩選範圍的中位數），共 ' +
+    pts.filter(function(p) { return p.rate >= mx && p[retKey] >= my; }).length + ' 檔，以下顯示配息率最高的 ' + win.length + ' 檔。';
+  if (!win.length) {
+    $('picks-body').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--muted);padding:18px">目前條件下沒有符合的標的</td></tr>';
+    return;
+  }
+  $('picks-body').innerHTML = win.map(function(p) {
+    var v = p[retKey];
+    return '<tr>'
+      + '<td style="max-width:260px;word-break:break-word;line-height:1.4">'
+        + (p.url ? '<a class="fund-link" href="' + p.url + '" target="_blank" rel="noopener noreferrer">' + eh(p.name) + '</a>' : eh(p.name))
+      + '</td>'
+      + '<td><span class="src-badge src-' + p.source + '">' + p.source + '</span></td>'
+      + '<td style="white-space:nowrap">' + eh(p.cur) + '</td>'
+      + '<td class="c">' + (p.rr ? '<span class="rr rr-' + p.rr.slice(2) + '">' + p.rr + '</span>' : '—') + '</td>'
+      + '<td class="r"><span class="rate-v">' + p.rate.toFixed(2) + '%</span></td>'
+      + '<td class="r"><span class="' + (v < 0 ? 'neg' : 'pos') + '">' + (v > 0 ? '+' : '') + v.toFixed(2) + '%</span></td>'
+      + '<td class="r">' + p.nav.toFixed(4) + '</td>'
+      + '</tr>';
+  }).join('');
+}
+
+window.addEventListener('DOMContentLoaded', boot);
+</script>
+</html>
