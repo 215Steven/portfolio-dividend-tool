@@ -90,11 +90,10 @@ body {
 .prog-btn:disabled { opacity: 0.5; cursor: default; }
 /* ── 圖表 ── */
 .chart-wrap { position: relative; }
-/* 限制高度：viewBox 為 1000×620，寬螢幕若不設上限會高達 800px 以上，
-   整張圖會超出視窗需捲動兩次才看得完。 */
-svg.chart { width: 100%; height: auto; display: block; touch-action: pan-y;
-            max-height: min(70vh, 640px); margin: 0 auto; }
-@media (max-width: 599px) { svg.chart { max-height: none; } }
+/* viewBox 由 setDims() 依容器寬度動態設定：寬螢幕採 1400×620 的扁長比例，
+   窄螢幕改為 700×720 的直式比例。用 max-height 壓高度會因 preserveAspectRatio
+   而在兩側留下大量空白，所以改成調整比例本身。 */
+svg.chart { width: 100%; height: auto; display: block; touch-action: pan-y; }
 .grid-line { stroke: #e8eef6; stroke-width: 1; }
 .med-line { stroke: #94a3b8; stroke-width: 1; stroke-dasharray: 4 4; }
 .axis-txt { font-size: 10.5px; fill: var(--muted); }
@@ -263,7 +262,7 @@ table.tbl tbody tr:hover td { background: #eef5ff; }
 
   <!-- 圖表 -->
   <div class="card chart-wrap">
-    <svg class="chart" id="chart" viewBox="0 0 1000 620" preserveAspectRatio="xMidYMid meet"
+    <svg class="chart" id="chart" viewBox="0 0 1400 620" preserveAspectRatio="xMidYMid meet"
          role="img" aria-label="配息率與報酬率散佈圖"></svg>
     <div class="tip" id="tip"></div>
     <div class="legend" id="legend"></div>
@@ -597,8 +596,16 @@ function niceBounds(vals, pad) {
 }
 
 // ── 繪圖 ──────────────────────────────────────────────────
-var W = 1000, H = 620, M = { t: 26, r: 22, b: 54, l: 62 };
+var W = 1400, H = 620, M = { t: 26, r: 22, b: 54, l: 62 };
+// 依容器寬度決定畫布比例：寬螢幕扁長、手機直式，避免圖高於視窗或被壓成細條
+function setDims() {
+  var cw = ($('chart').parentElement && $('chart').parentElement.clientWidth) || 900;
+  if (cw < 620) { W = 700;  H = 720; M = { t: 22, r: 14, b: 52, l: 54 }; }
+  else          { W = 1400; H = 620; M = { t: 26, r: 22, b: 54, l: 62 }; }
+  $('chart').setAttribute('viewBox', '0 0 ' + W + ' ' + H);
+}
 function redraw() {
+  setDims();
   var retKey = $('c-ret').value;
   var colorBy = $('c-color').value;
   var pts = currentSet();
@@ -777,6 +784,12 @@ function renderPicks(pts, mx, my, retKey) {
   }).join('');
 }
 
+// 視窗寬度變化時重算比例（例如旋轉手機或縮放視窗）
+var _rsTimer = null;
+window.addEventListener('resize', function() {
+  clearTimeout(_rsTimer);
+  _rsTimer = setTimeout(function() { if (_all.length) redraw(); }, 200);
+});
 window.addEventListener('DOMContentLoaded', boot);
 </script>
 </html>
