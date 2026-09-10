@@ -90,7 +90,11 @@ body {
 .prog-btn:disabled { opacity: 0.5; cursor: default; }
 /* ── 圖表 ── */
 .chart-wrap { position: relative; }
-svg.chart { width: 100%; height: auto; display: block; touch-action: pan-y; }
+/* 限制高度：viewBox 為 1000×620，寬螢幕若不設上限會高達 800px 以上，
+   整張圖會超出視窗需捲動兩次才看得完。 */
+svg.chart { width: 100%; height: auto; display: block; touch-action: pan-y;
+            max-height: min(70vh, 640px); margin: 0 auto; }
+@media (max-width: 599px) { svg.chart { max-height: none; } }
 .grid-line { stroke: #e8eef6; stroke-width: 1; }
 .med-line { stroke: #94a3b8; stroke-width: 1; stroke-dasharray: 4 4; }
 .axis-txt { font-size: 10.5px; fill: var(--muted); }
