@@ -600,7 +600,8 @@ var W = 1400, H = 620, M = { t: 26, r: 22, b: 54, l: 62 };
 // 依容器寬度決定畫布比例：寬螢幕扁長、手機直式，避免圖高於視窗或被壓成細條
 function setDims() {
   var cw = ($('chart').parentElement && $('chart').parentElement.clientWidth) || 900;
-  if (cw < 620) { W = 700;  H = 720; M = { t: 22, r: 14, b: 52, l: 54 }; }
+  // 手機：拉高為接近 1:1.5 的直式，291 個點在 330px 寬的畫布上才不會疊成一團
+  if (cw < 620) { W = 700;  H = 1020; M = { t: 22, r: 16, b: 54, l: 56 }; }
   else          { W = 1400; H = 620; M = { t: 26, r: 22, b: 54, l: 62 }; }
   $('chart').setAttribute('viewBox', '0 0 ' + W + ' ' + H);
 }
