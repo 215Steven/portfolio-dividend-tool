@@ -1181,6 +1181,106 @@ table.vbct-tbl td.c { text-align: center; }
   .pf-filter-item select { width: 100%; min-height: 40px; }
   .pf-filter-reset { flex: 1 1 100%; min-height: 40px; }
 }
+/* ═══════════════════════════════════════════════════════════
+   手機版搜尋結果：緊湊卡片
+   通用的「每個 td 自成一列」卡片模式在 12 欄時會讓每張卡片高達
+   471px（約 0.58 個螢幕），60 筆要捲近 28000px。改用 4 欄 Grid 把
+   相關欄位併排，壓到約 170px，且不隱藏任何欄位。
+   只套用於搜尋結果表，分析結果的表格維持原本的逐列卡片。
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 599px) {
+  .pf-search-scroll { max-height: none; overflow-x: hidden; }
+  .pf-search-scroll table.vbct-tbl tbody { gap: 8px; }
+  .pf-search-scroll table.vbct-tbl tr.vr {
+    display: grid;
+    /* minmax(0,1fr)：用 1fr 時長數值（如 +296.97）會撐開該欄，
+       造成四個數字框寬度不一、並把「加入」按鈕擠到換行 */
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    align-items: center;
+    padding: 9px 11px 10px;
+    row-gap: 7px;
+    column-gap: 6px;
+  }
+  /* 共通：取消逐列邊框與左右對齊，改由 Grid 定位 */
+  .pf-search-scroll table.vbct-tbl tr.vr td {
+    display: flex;
+    border-bottom: none;
+    padding: 0;
+    min-height: 0;
+    text-align: left !important;
+    align-items: baseline;
+    gap: 4px;
+  }
+  .pf-search-scroll table.vbct-tbl tr.vr td::before { content: none; }
+
+  /* 第 1 列：基金名稱（整寬） */
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(1) {
+    grid-area: 1 / 1 / 2 / 5;
+    background: none; border-bottom: none; padding: 0 0 1px;
+    display: block; max-width: 100%;
+  }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(1) .fund-link,
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(1) {
+    font-size: 13px; font-weight: 700; line-height: 1.35; color: var(--navy);
+  }
+
+  /* 第 2 列：來源／頻率／風險／幣別 四個徽章 */
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(2) { grid-area: 2 / 1 / 3 / 2; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(5) { grid-area: 2 / 2 / 3 / 3; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(6) { grid-area: 2 / 3 / 3 / 4; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(4) { grid-area: 2 / 4 / 3 / 5; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(4) {
+    font-size: 11px; color: var(--muted); justify-content: flex-start;
+  }
+
+  /* 第 3 列：四個關鍵數字，標籤在上、數值在下 */
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(8)  { grid-area: 3 / 1 / 4 / 2; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(9)  { grid-area: 3 / 2 / 4 / 3; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(10) { grid-area: 3 / 3 / 4 / 4; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(11) { grid-area: 3 / 4 / 4 / 5; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(8),
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(9),
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(10),
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(11) {
+    flex-direction: column; align-items: flex-start; gap: 1px;
+    background: #f7fafd; border-radius: 6px; padding: 4px 6px 5px;
+    font-size: 12.5px; font-variant-numeric: tabular-nums;
+    min-width: 0; overflow: hidden;
+  }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(8) b,
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(9) b,
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(10) b,
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(11) b { font-size: 12.5px; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(8)::before,
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(9)::before,
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(10)::before,
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(11)::before {
+    content: attr(data-label);
+    display: block; font-size: 9px; font-weight: 700; color: #94a3b8;
+    letter-spacing: 0.2px; margin: 0; white-space: nowrap;
+  }
+  /* 年化配息率是主要判斷依據，放大並用品牌色 */
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(8) { background: #fffaf2; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(8) .pf-rate { font-size: 14px; }
+
+  /* 第 4 列：代碼（1 欄）＋淨值（2 欄，數值較長）＋操作按鈕 */
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(3) { grid-area: 4 / 1 / 5 / 2; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(7) { grid-area: 4 / 2 / 5 / 4; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(3),
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(7) {
+    font-size: 10.5px; color: #94a3b8; align-items: center;
+    justify-content: flex-start; min-width: 0; overflow: hidden; white-space: nowrap;
+  }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(3)::before { content: '代碼'; color: #c3ccd8; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(7)::before { content: '淨值'; color: #c3ccd8; }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(12) {
+    grid-area: 4 / 4 / 5 / 5; justify-content: flex-end; min-width: 0;
+  }
+  .pf-search-scroll table.vbct-tbl tr.vr td:nth-child(12) .pf-add-btn {
+    width: 100%; justify-content: center; min-height: 36px;
+    padding: 0 6px; font-size: 11.5px; white-space: nowrap;
+  }
+}
 .src-badge { display: inline-block; padding: 1px 7px; border-radius: 5px; font-size: 10.5px; font-weight: 700; color: #fff; white-space: nowrap; }
 .src-VBCT { background: var(--blue); }
 .src-VCCT { background: #c2410c; }
