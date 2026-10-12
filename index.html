@@ -3343,4 +3343,63 @@ window.addEventListener('DOMContentLoaded', function() {
   window.addEventListener('resize', function(){ if(isMobile()) init(); else teardown(); });
 })();
 </script>
+<script>
+/* 手機排序膠囊列：組合分析原本只能點表頭排序 */
+(function(){
+  var COLS = { '配息率': 7, '一年': 9, '三年': 10 };
+  function isMobile(){ return window.innerWidth < 768; }
+  function init(){
+    if(!isMobile()) return;
+    if(document.querySelector('.mob-ctrl-bar')) return;
+    var row = document.querySelector('.pf-search-row');
+    var tbl = document.querySelector('table.vbct-tbl');
+    if(!row || !tbl){ setTimeout(init, 400); return; }
+    var bar = document.createElement('div');
+    bar.className = 'mob-ctrl-bar';
+    var pills = [];
+    Object.keys(COLS).forEach(function(k){
+      var b = document.createElement('button');
+      b.className = 'mob-sort-pill';
+      b.textContent = k + ' \u2193';
+      b.dataset.v = COLS[k];
+      pills.push(b); bar.appendChild(b);
+      b.addEventListener('click', function(){
+        var col = +this.dataset.v;
+        // pfSortBy 會自己反轉方向，故先寫入 -d 再呼叫
+        var d2 = (this.classList.contains('ms-active') && this.dataset.d === '-1') ? 1 : -1;
+        this.dataset.d = d2;
+        window._pfSortCol = col; window._pfSortDir = -d2;
+        if(typeof pfSortBy === 'function') pfSortBy(col);
+        var self = this;
+        pills.forEach(function(p){
+          p.classList.remove('ms-active');
+          p.textContent = p.textContent.replace(/\s*[\u2191\u2193]\s*$/,'') + ' \u2193';
+        });
+        self.classList.add('ms-active');
+        self.textContent = self.textContent.replace(/\s*[\u2191\u2193]\s*$/,'') + (d2 === 1 ? ' \u2191' : ' \u2193');
+      });
+    });
+    row.parentElement.insertBefore(bar, row.nextSibling);
+    fixTop();
+  }
+  function fixTop(){
+    if(!isMobile()) return;
+    var hdr = document.querySelector('.vbct-header');
+    var bar = document.querySelector('.mob-ctrl-bar');
+    var lh  = document.querySelector('.mc-lhead');
+    if(!bar) return;
+    if(hdr) bar.style.top = hdr.offsetHeight + 'px';
+    // 標籤列要堆在膠囊列之下，否則兩層吸頂會重疊
+    if(lh) lh.style.top = ((hdr ? hdr.offsetHeight : 0) + bar.offsetHeight) + 'px';
+  }
+  if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
+  else init();
+  [400,1200,2500,5000].forEach(function(t){ setTimeout(fixTop, t); });
+  window.addEventListener('load', fixTop);
+  window.addEventListener('resize', function(){
+    if(isMobile()){ init(); fixTop(); }
+    else { var b = document.querySelector('.mob-ctrl-bar'); if(b) b.remove(); }
+  });
+})();
+</script>
 </html>
