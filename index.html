@@ -1740,11 +1740,84 @@ function isDiscretionary(f) { return f.V41 === 'D' || (f.V5 && f.V5.includes('�
 function isFubonETF(f)       { return f.V41 === 'C'; }
 function isISharesName(name) { return name && name.toLowerCase().includes('ishares'); }
 // 取得基金頁面 URL（絕對路徑）
+// ───── 富邦新版 API 輔助（2026/10 改版）─────
+const PROXY_POST = '/api/post';
+async function fbPost(path, body) {
+  const r = await fetch(PROXY_POST + '?path=' + encodeURIComponent(path), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+    signal: AbortSignal.timeout(30000)
+  });
+  if (!r.ok) throw new Error('API ' + path + ' -> ' + r.status);
+  const j = await r.json();
+  return j && j.data;
+}
+// '13.80%' -> 13.8；'N/A' -> null
+function pctNum(s) {
+  if (s === null || s === undefined) return null;
+  const n = parseFloat(String(s).replace(/[^0-9.\-]/g, ''));
+  return isNaN(n) ? null : n;
+}
+function daysSince(dstr) {
+  if (!dstr) return 99999;
+  const t = Date.parse(String(dstr).replace(/\//g, '-'));
+  return isNaN(t) ? 99999 : (Date.now() - t) / 86400000;
+}
+function ymdAgo(days) {
+  const d0 = new Date(Date.now() - days * 86400000);
+  const p = function(n) { return (n < 10 ? '0' : '') + n; };
+  return d0.getFullYear() + '/' + p(d0.getMonth() + 1) + '/' + p(d0.getDate());
+}
+// 新版清單沒有配息頻率欄位，先由名稱猜，拿到配息明細後再用間隔修正
+function freqFromName(name) {
+  const s = String(name || '');
+  if (/月配|月中配息|月撥|月收益/.test(s)) return '月配';
+  if (/季配/.test(s)) return '季配';
+  if (/半年配/.test(s)) return '半年配';
+  if (/年配/.test(s)) return '年配';
+  return '無';
+}
+function guessFreq(rows) {
+  if (!rows || rows.length < 3) return null;
+  const ds = rows.slice(0, 5).map(function(r) {
+    return Date.parse(String(r.recordDate || r.dividendDate || r.date || '').replace(/\//g, '-'));
+  }).filter(function(t) { return !isNaN(t); });
+  if (ds.length < 3) return null;
+  let gap = 0;
+  for (let i = 1; i < ds.length; i++) gap += Math.abs(ds[i - 1] - ds[i]) / 86400000;
+  gap = gap / (ds.length - 1);
+  if (gap < 45) return '月配';
+  if (gap < 135) return '季配';
+  if (gap < 225) return '半年配';
+  return '年配';
+}
+// getAssets 的一筆 -> 舊版 V 欄位結構
+function toLegacy(a) {
+  const t = a.optionType === 'ETF' ? 'C'
+          : a.optionType === 'DIA' ? 'D'
+          : a.optionType === 'WFUND' ? 'B' : 'A';
+  return {
+    V40: a.assetFbCode || '',
+    V41: t,
+    V47: a.assetFbCode || '',
+    V3:  a.assetChName || '',
+    V5:  a.assetType || '',
+    V18: (a.netAssetValue === null || a.netAssetValue === undefined) ? '' : String(a.netAssetValue),
+    V26: a.currencyName || '',
+    V28: a.riskLevel || '',
+    V42: freqFromName(a.assetChName),
+    _company: a.optionCompany || '',
+    _otype: a.optionType || '',
+    _raw: a
+  };
+}
 function getFundUrl(f) {
-  if (f.V41 === 'B') return FUBON_BASE + '/w/wb/wb01.djhtm?a=' + f.V40;
-  if (f.V41 === 'A') return FUBON_BASE + '/w/wr/wr01.djhtm?a=' + f.V40;
-  if (f.V41 === 'C') return FUBON_BASE + '/ETFWeb/HTML/ET050000.DJHTM#ETFID=' + f.V40;
-  return null;
+  // 新版標的頁：/funds/overview/{optionType}/{optionCompany}/{assetFbCode}
+  if (f._otype && f._company) {
+    return FUBON_BASE + '/funds/overview/' + f._otype + '/' + f._company + '/' + f.V40;
+  }
+  return FUBON_BASE + '/funds/overview';
 }
 function isoDate(d) {
   return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
@@ -2037,17 +2110,21 @@ function btStat(label, val, neg, inlineNote) {
 }
 // 抓取單一標的「全部」配息記錄（不限近6月），供回測還原使用
 async function fetchDividendHistory(r) {
-  if (!r.v40 || !r.v41) return [];
-  var isISh = isISharesName(r.name);
+  if (!r.v40) return [];
   try {
-    if (r.v41 === 'C') {
-      var jtext = await fetchBig5('/ETFData/djjson/et050000json.djjson?a=' + r.v40);
-      return parseEtfDivJson(jtext, isISh);
-    } else if (r.v41 === 'B') {
-      return parseDivHtml(await fetchBig5('/w/wb/wb05.djhtm?a=' + r.v40), isISh);
-    } else if (r.v41 === 'A') {
-      return parseDivHtml(await fetchBig5('/w/wr/wr10.djhtm?a=' + r.v40), isISh);
-    }
+    var isETF = r.v41 === 'C';
+    var rows = await fbPost(isETF ? '/api/etf/getEtfDividends' : '/api/fund/getFundDividends',
+      { assetFbCode: r.v40, startDate: ymdAgo(2000), endDate: ymdAgo(0) });
+    var out = (rows || []).map(function(x) {
+      var ds = x.recordDate || x.dividendDate || x.date || '';
+      var am = parseFloat(x.dividendPerUnit);
+      if (!ds || isNaN(am) || am <= 0) return null;
+      return { date: String(ds).replace(/\//g, '-').substring(0, 7), amount: am };
+    }).filter(Boolean);
+    // 新版清單沒有配息頻率，拿到明細後用間隔回寫
+    var fq = guessFreq(rows);
+    if (fq) r.freq = fq;
+    return out;
   } catch (e) { /* 配息資料抓取失敗，不中斷回測流程，僅略過還原 */ }
   return [];
 }
@@ -2219,7 +2296,7 @@ function retCell(v) {
 // ─────────────────────────────────────────────────────────
 // localStorage 快取（基金清單，每日台灣中午 12 點更新）
 // ─────────────────────────────────────────────────────────
-var FUND_CACHE_KEY = 'portfolio-fundlist-v4';
+var FUND_CACHE_KEY = 'portfolio-fundlist-v5';
 function nextNoonTW() {
   var now = new Date();
   var candidate = new Date(now);
@@ -2244,29 +2321,17 @@ function saveFundCache(list) {
 // ─────────────────────────────────────────────────────────
 // 基金清單抓取（同時支援 VBCT／VCCT／UND 三種商品代碼）
 // ─────────────────────────────────────────────────────────
+var _assetsCache = null;
 async function fetchFundList(product) {
-  // 一般版取基本資料，績效版（M=1）取累積報酬率。兩支都是整批 JSON，
-  // 各險種只需一次請求，不需逐檔抓取。
-  // 績效版欄位：V11=三個月, V12=六個月, V13=一年, V15=三年（無二年）
-  var pair = await Promise.all([
-    fetchBig5('/w/custom/djjson/SearchProductJSON.djjson?m=0&P=' + product + '&Change=1'),
-    fetchBig5('/w/custom/djjson/SearchProductJSON.djjson?P1=fubonlif&P2=False&P3=False&P4=0&P5=0&M=1&P=' + product + '&CHANGE=1')
-      .catch(function() { return null; })
-  ]);
-  var funds = JSON.parse(pair[0]).ResultSet.Result || [];
-  var retMap = {};
-  if (pair[1]) {
-    try {
-      (JSON.parse(pair[1]).ResultSet.Result || []).forEach(function(r) {
-        function pv(v) { var n = parseFloat(v); return isNaN(n) ? null : n; }
-        retMap[r.V40] = { m6: pv(r.V12), y1: pv(r.V13), y3: pv(r.V15) };
-      });
-    } catch(e) { /* 報酬率解析失敗不中斷主流程 */ }
-  }
-  return funds
+  // 富邦 2026/10 改版：一次 getAssets 拿全部標的，三個險種共用同一份
+  if (!_assetsCache) _assetsCache = await fbPost('/api/asset/getAssets', {});
+  var mine = (_assetsCache || []).filter(function(a) {
+    return (a.insurances || []).some(function(x) { return x.code === product; });
+  });
+  return mine.map(toLegacy)
     .filter(function(f) { return !isDiscretionary(f); }) // 排除 D 型全權委託（不支援逐日淨值）
     .map(function(f) {
-      var rr = retMap[f.V40] || {};
+      var a = f._raw || {};
       return {
         key: product + '-' + f.V40,
         source: product,
@@ -2279,9 +2344,10 @@ async function fetchFundList(product) {
         freq: f.V42 || '無',
         rr: f.V28 || '',
         nav: parseFloat(f.V18) || 0,
-        ret6m: rr.m6 == null ? null : rr.m6,
-        ret1y: rr.y1 == null ? null : rr.y1,
-        ret3y: rr.y3 == null ? null : rr.y3,
+        divDate: a.dividendDate || '',
+        ret6m: pctNum(a.sixMonthReturn),
+        ret1y: pctNum(a.oneYearReturn),
+        ret3y: pctNum(a.threeYearReturn),
         url: getFundUrl(f)
       };
     });
@@ -2296,7 +2362,8 @@ var RATE_NOTE = '年化配息率＝近 6 個月月配平均 × 12 ÷ 當日淨�
 var _rateQueue = [];
 var _rateRunning = false;
 function needsRate(f) {
-  return f.freq === '月配' && f.nav > 0 && f.rate === undefined && !f._q;
+  var likely = f.freq === '月配' || daysSince(f.divDate) <= 45;
+  return likely && f.nav > 0 && f.rate === undefined && !f._q;
 }
 // 將指定標的排入計算佇列（重複排入無效果）
 function queueRates(list) {
