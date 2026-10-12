@@ -1342,7 +1342,7 @@ table.vbct-tbl td.c { text-align: center; }
     position: sticky; z-index: 15; box-shadow: 0 1px 0 rgba(0,0,0,.06);
     font-size: 9.5px; font-weight: 700; color: #8a98a8; letter-spacing: .3px;
   }
-  .mc-lhead i { font-style: normal; text-align: right; cursor: pointer;
+  .mc-lhead i { font-style: normal; text-align: right; cursor: default;
     padding: 3px 0; border-radius: 4px; user-select: none;
     -webkit-tap-highlight-color: transparent; white-space: nowrap; }
   .mc-lhead i:first-child { text-align: left; }
@@ -1426,6 +1426,27 @@ table.vbct-tbl td.c { text-align: center; }
     @media (max-width: 767px) {
       /* 保險：舊版卡片的收合動畫若留有 max-height:0，展開區會被裁掉 */
       .mobile-card.mc-open .mc-extra { max-height: none !important; overflow: visible !important; }
+    }
+  
+    @media (max-width: 767px) {
+      /* 統計卡改為可換行的標籤，原本橫向捲動會把最後一張裁成一半 */
+      .vbct-stats { display: flex !important; flex-wrap: wrap !important; overflow: visible !important;
+                     gap: 6px !important; padding: 8px 0 8px !important; }
+      .vbct-stat { flex: 0 0 auto !important; display: inline-flex !important;
+                    flex-direction: row-reverse !important; align-items: baseline !important;
+                    gap: 4px !important; padding: 5px 9px !important; min-width: 0 !important;
+                    border-radius: 7px !important; }
+      .vbct-stat-num { font-size: 14px !important; line-height: 1.2 !important; }
+      .vbct-stat-label { font-size: 10.5px !important; line-height: 1.2 !important; letter-spacing: 0 !important; }
+      /* 排序膠囊列（與另外三支工具一致） */
+      .mob-ctrl-bar { display: flex; gap: 6px; padding: 8px 0 4px; align-items: center;
+                      position: sticky; z-index: 40; background: var(--bg, #f3f6fb); }
+      .mob-sort-pill { flex: 1 1 0; padding: 9px 4px; border: 1.5px solid #e2e8f0; border-radius: 8px;
+                       background-color: #fff; color: #475569; font-size: 12px; font-weight: 500;
+                       font-family: inherit; cursor: pointer; text-align: center; white-space: nowrap;
+                       -webkit-tap-highlight-color: transparent; transition: transform .1s; }
+      .mob-sort-pill.ms-active { background-color: #1d4ed8; color: #fff; border-color: #1d4ed8; font-weight: 700; }
+      .mob-sort-pill:active { transform: scale(0.96); }
     }
   </style>
 </head>
@@ -3263,7 +3284,7 @@ window.addEventListener('DOMContentLoaded', function() {
       var el = is[i], col = +el.getAttribute('data-col');
       var on = (curCol() === col);
       el.classList.toggle('ms-on', on);
-      el.textContent = el.getAttribute('data-base') + (on ? (curDir()===-1?' ↓':' ↑') : '');
+      el.textContent = el.getAttribute('data-base');
     }
   }
   function ensureHead(table){
@@ -3279,15 +3300,6 @@ window.addEventListener('DOMContentLoaded', function() {
     }
     head.innerHTML = h;
     box.insertBefore(head, box.firstChild);
-    head.addEventListener('click', function(ev){
-      var i = ev.target.closest('i'); if(!i) return;
-      var col = +i.getAttribute('data-col');
-      // 數值欄首次點擊給「高→低」；代號給 A→Z
-      var first = (curCol() !== col);
-      var dir = first ? (col === SORTCOL['代號'] ? 1 : -1) : -curDir();
-      doSort(col, dir);
-      setTimeout(function(){ paintHead(head); }, 60);
-    });
     head.style.top = stickyOffset(head)+'px';
     paintHead(head);
   }
