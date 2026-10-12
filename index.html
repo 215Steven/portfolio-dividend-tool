@@ -1843,25 +1843,25 @@ function parseNavSeries(text) {
 // 依基金類型抓取最長可得的逐日淨值序列
 // 三種類型皆改用「自訂日期區間」參數（b=0&c=起&d=訖），請求極早起始日以取得自基金成立日起算之全部歷史
 // （b=7&c=1&d=1 為官網預設五年區間參數，會被伺服器硬性裁切為 5 年，故改用自訂區間參數繞過此限制）
+// 依基金類型抓取最長可得的逐日淨值序列
+// 富邦 2026/10 改版：舊的 .djbcd 端點改回錯誤頁，改用 getFundNavs／getEtfNavs，
+// 起始日給 1990 即可取得自成立日起算的全部歷史（實測 ABB3 回傳 2208 筆）
 async function fetchDailyNav(f) {
-  var end = isoDate(new Date());
-  var earlyStart = '1990-01-01';
-  if (f.v41 === 'C') {
-    var ticker = (f.v40 || '').split('~')[0];
-    if (!ticker) return { dates: [], navs: [] };
-    var path = '/ETFData/bcd/eBCDNavMktList.djbcd?P1=FUBONLIF&P2=&P3=True&P4=True&P5=True&a=' + encodeURIComponent(ticker) + '&B=2000-01-01&C=' + end;
-    return parseNavSeries(await fetchBig5(path));
-  } else if (f.v41 === 'B') {
-    var tickerB = (f.v40 || '').split('-')[0];
-    if (!tickerB) return { dates: [], navs: [] };
-    var pathB = '/w/bcd/BCDNavList.djbcd?a=' + encodeURIComponent(tickerB) + '&b=0&c=' + earlyStart + '&d=' + end;
-    return parseNavSeries(await fetchBig5(pathB));
-  } else if (f.v41 === 'A') {
-    var tickerA = (f.v40 || '').split('-')[0];
-    if (!tickerA) return { dates: [], navs: [] };
-    var pathA = '/w/bcd/tBCDNavList.djbcd?a=' + encodeURIComponent(tickerA) + '&b=0&c=' + earlyStart + '&d=' + end;
-    return parseNavSeries(await fetchBig5(pathA));
-  }
+  if (!f.v40) return { dates: [], navs: [] };
+  try {
+    var isETF = f.v41 === 'C';
+    var rows = await fbPost(isETF ? '/api/etf/getEtfNavs' : '/api/fund/getFundNavs',
+      { assetFbCode: f.v40, startDate: '1990/01/01', endDate: ymdAgo(0) });
+    var list = (rows || []).map(function(x) {
+      var dt = String(x.date || '').replace(/\//g, '-');
+      var nv = parseFloat(x.nav);
+      return (dt && !isNaN(nv) && nv > 0) ? { d: dt, n: nv } : null;
+    }).filter(Boolean).sort(function(a, b) { return a.d < b.d ? -1 : (a.d > b.d ? 1 : 0); });
+    return {
+      dates: list.map(function(x) { return x.d; }),
+      navs:  list.map(function(x) { return x.n; })
+    };
+  } catch (e) { /* 淨值抓取失敗，回測該標的略過 */ }
   return { dates: [], navs: [] };
 }
 // 期間統計：期間報酬／年化報酬／年化波動度／夏普比率／最大回撤／期間最高／期間最低／目前淨值
