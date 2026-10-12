@@ -1409,6 +1409,19 @@ table.vbct-tbl td.c { text-align: center; }
       table.vbct-tbl > thead > tr > th,
       table.vbct-tbl > tbody > tr.vr > td { padding-left: 6px !important; padding-right: 6px !important; }
     }
+  
+    @media (max-width: 767px) {
+      /* 名稱列尾端箭頭提示可展開（組合分析保留表頭排序，因無膠囊列） */
+      .mc-nm::after { content: ' ⌄'; color: #b9c4d2; font-weight: 700; }
+      .mobile-card.mc-open .mc-nm::after { content: ' ⌃'; }
+      .mc-ext-wrap { margin-top: 9px; }
+      .mc-ext {
+        display: block; text-align: center; min-height: 36px; line-height: 36px;
+        border: 1px solid var(--border); border-radius: 8px;
+        font-size: 12.5px; font-weight: 700; color: var(--blue);
+        text-decoration: none; background: #f7fafd;
+      }
+    }
   </style>
 </head>
 <body>
@@ -3184,9 +3197,7 @@ window.addEventListener('DOMContentLoaded', function() {
           '<span class="mc-code">'+txt(T('code'))+'</span>'+
           rateCell(T('rate'))+ retCell(T('r1y'))+ retCell(T('r3y'))+ riskCell(T('risk'))+
         '</div>'+
-        '<div class="mc-nm">'+(nameA
-          ? '<a href="'+nameA.href+'" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">'+nameTxt+'</a>'
-          : nameTxt)+'</div>'+
+        '<div class="mc-nm">'+nameTxt+'</div>'+
         '<div class="mc-extra">'+
           '<div class="mc-grid">'+
             g('幣別', txt(T('cur')))+ g('頻率', txt(T('freq')))+
@@ -3195,6 +3206,7 @@ window.addEventListener('DOMContentLoaded', function() {
             (COLS.src!=null  ? g('來源', txt(T('src')))  : '')+
           '</div>'+
           (hasDiv6 ? '<div class="mc-div6m"><div class="mc-div6m-title">近6月配息</div>'+div6H+'</div>' : '')+
+          (nameA ? '<div class="mc-ext-wrap"><a class="mc-ext" href="'+nameA.href+'" target="_blank" rel="noopener">富邦官網標的頁面 ↗</a></div>' : '')+
           '<div class="mc-analyze"></div>'+
         '</div>';
       row.insertBefore(mc, row.firstChild);
