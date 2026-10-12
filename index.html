@@ -1422,6 +1422,11 @@ table.vbct-tbl td.c { text-align: center; }
         text-decoration: none; background: #f7fafd;
       }
     }
+  
+    @media (max-width: 767px) {
+      /* 保險：舊版卡片的收合動畫若留有 max-height:0，展開區會被裁掉 */
+      .mobile-card.mc-open .mc-extra { max-height: none !important; overflow: visible !important; }
+    }
   </style>
 </head>
 <body>
