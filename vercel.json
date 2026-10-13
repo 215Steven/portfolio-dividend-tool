@@ -1,9 +1,14 @@
 {
-  "cleanUrls": true,
-  "crons": [
+  "redirects": [
     {
-      "path": "/api/vcct-top10",
-      "schedule": "0 4 * * *"
+      "source": "/",
+      "destination": "https://fund.oosayhi.com/portfolio",
+      "permanent": true
+    },
+    {
+      "source": "/index.html",
+      "destination": "https://fund.oosayhi.com/portfolio",
+      "permanent": true
     }
   ]
 }
